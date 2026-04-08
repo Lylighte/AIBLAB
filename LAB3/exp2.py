@@ -25,6 +25,8 @@ For example:
 """
 
 import math, sys
+import io
+from contextlib import redirect_stdout
 
 def gcd(a, b):
     a, b = abs(a), abs(b)
@@ -62,6 +64,41 @@ def get_rational(s):
     s = s.strip('()')
     n, d = map(int, s.split('/'))
     return [n, d]
+
+def test_all_functions():
+    total = 0
+    passed = 0
+
+    def check(name, actual, expected):
+        nonlocal total, passed
+        total += 1
+        if actual == expected:
+            passed += 1
+            print(f"[PASS] {name}: {actual}")
+        else:
+            print(f"[FAIL] {name}: expected={expected}, actual={actual}")
+
+    check('gcd(54, 24)', gcd(54, 24), 6)
+    check('gcd(-18, 30)', gcd(-18, 30), 6)
+
+    check('reduce(10, 20)', reduce(10, 20), [1, 2])
+    check('reduce(-8, -12)', reduce(-8, -12), [2, 3])
+    check('reduce(4, -6)', reduce(4, -6), [-2, 3])
+
+    check("get_rational('(2/3)')", get_rational('(2/3)'), [2, 3])
+    check("get_rational('(-70/40)')", get_rational('(-70/40)'), [-70, 40])
+
+    check('add([2, 3], [-70, 40])', add([2, 3], [-70, 40]), [-13, 12])
+    check('sub([-20, 3], [120, 470])', sub([-20, 3], [120, 470]), [-976, 141])
+    check('mul([-6, 19], [-114, 18])', mul([-6, 19], [-114, 18]), [2, 1])
+    check('div([-6, 19], [-114, -28])', div([-6, 19], [-114, -28]), [-28, 361])
+
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        output([1, 2])
+    check('output([1, 2])', buf.getvalue().strip(), '1/2')
+
+    print(f"Summary: {passed}/{total} passed")
 
 if __name__ == '__main__':
     if len(sys.argv) == 1:

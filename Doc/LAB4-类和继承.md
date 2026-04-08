@@ -113,6 +113,7 @@ class Polynomial:
             if abs(poly[power]) > tol:
                 self.poly[power] = poly[power]
 
+    # call 功能：对多项式 p(x) 在 x=t 时求值的语法简化 p(t) 被转换为与其等价的方法调用 p.__call__(t)
     def __call__(self, x):
         value = 0.0
         for power in self.poly:
