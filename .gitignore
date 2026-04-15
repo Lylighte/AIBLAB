@@ -62,3 +62,27 @@ Thumbs.db
 *.tmp
 *.bak
 *.temp
+
+# Datasets and model artifacts (keep out of git)
+data/
+datasets/
+raw_data/
+processed_data/
+
+*.csv
+*.tsv
+*.jsonl
+*.parquet
+*.feather
+*.h5
+*.hdf5
+*.npz
+*.npy
+*.pkl
+*.pickle
+*.joblib
+*.pt
+*.pth
+
+# If needed, keep only tiny examples via explicit whitelist patterns, e.g.:
+# !data/sample.csv
