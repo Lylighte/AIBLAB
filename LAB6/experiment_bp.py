@@ -111,6 +111,7 @@ def softmax(x):
     e_x = np.exp(x - np.max(x, axis=1, keepdims=True))
     return e_x / np.sum(e_x, axis=1, keepdims=True)
 
+# 非线性网络定义
 
 class ReluNeuralNetwork:
     def __init__(self, input_size, hidden1_size, hidden2_size, output_size):
@@ -129,7 +130,8 @@ class ReluNeuralNetwork:
         self.bias_3 = np.zeros((1, output_size))
 
     def forward(self, X):
-
+        
+        # 使用公式计算a_1, a_2, y_pred，并将它们保存在 self.a_1, self.a_2, self.y_pred 中，供后续反向传播使用
         '''
         前向传播:第一隐藏层激活 a_1 的计算 [代码已经给出]
         '''
@@ -139,13 +141,13 @@ class ReluNeuralNetwork:
         '''
         TODO: 前向传播:第二隐藏层激活 a_2 的计算 [需要补全 None 代表部分的代码] 
         '''  
-        self.z_2 = None
-        self.a_2 = None
+        self.z_2 = self.a_1 @ self.weights_2 + self.bias_2
+        self.a_2 = relu(self.z_2)
         
         '''
         TODO: 前向传播:输出层 y_pred 的计算 [需要补全 None 代表部分的代码] 
         '''  
-        self.z_3 = None
+        self.z_3 = self.a_2 @ self.weights_3 + self.bias_3
         self.y_pred = softmax(self.z_3)
 
         return self.y_pred
@@ -167,10 +169,10 @@ class ReluNeuralNetwork:
             [需要补全 None 代表部分的代码] 
         '''
         # 计算误差项 e_2
-        e_2 = None
+        e_2 = (e_3 @ self.weights_3.T) * relu_derivative(self.z_2)
         # self.weights_2, self.bias_2 参数梯度的计算
-        grad_weights_2 = None
-        grad_bias_2 = None
+        grad_weights_2 = self.a_1.T @ e_2 / batch_size
+        grad_bias_2 = np.sum(e_2, axis=0, keepdims=True) / batch_size
 
         
         '''
@@ -178,18 +180,18 @@ class ReluNeuralNetwork:
             [需要补全 None 代表部分的代码] 
         '''
         # 计算误差项 e_1
-        e_1 = None
+        e_1 = (e_2 @ self.weights_2.T) * relu_derivative(self.z_1)
         # self.weights_1, self.bias_1 参数梯度的计算
-        grad_weights_1 = None
-        grad_bias_1 = None
+        grad_weights_1 = X.T @ e_1 / batch_size
+        grad_bias_1 = np.sum(e_1, axis=0, keepdims=True) / batch_size
         # 梯度下降，更新网络参数
 
         self.weights_3 -= grad_weights_3 * learning_rate
         self.bias_3 -= bias_weights_3 * learning_rate
-        self.weights_2 -= None
-        self.bias_2 -= None
-        self.weights_1 -= None
-        self.bias_1 -= None
+        self.weights_2 -= grad_weights_2 * learning_rate
+        self.bias_2 -= grad_bias_2 * learning_rate
+        self.weights_1 -= grad_weights_1 * learning_rate
+        self.bias_1 -= grad_bias_1 * learning_rate
 
 
     def train(self, X, y, epochs, learning_rate):
@@ -208,6 +210,7 @@ class ReluNeuralNetwork:
                 loss = -np.mean(y * np.log(y_pred + 1e-8))
                 print(f"Epoch {epoch}, Loss: {loss:.4f}")
 
+# 线性网络的定义：与非线性网络的区别在于前向传播过程中没有 ReLU 激活函数，反向传播过程中也不需要计算 ReLU 的导数
 
 class LinearNeuralNetwork:
     def __init__(self, input_size, hidden1_size, hidden2_size, output_size):
@@ -230,20 +233,20 @@ class LinearNeuralNetwork:
         '''
         TODO: 前向传播:第一隐藏层激活 a_1 的计算 [需要补全 None 代表部分的代码] 
         '''
-        self.z_1 = None
-        self.a_1 = None
+        self.z_1 = X @ self.weights_1 + self.bias_1
+        self.a_1 = self.z_1
         
         '''
         TODO: 前向传播:第二隐藏层激活 a_2 的计算 [需要补全 None 代表部分的代码] 
         '''  
-        self.z_2 = None
-        self.a_2 = None
+        self.z_2 = self.a_1 @ self.weights_2 + self.bias_2
+        self.a_2 = self.z_2
         
         '''
         TODO: 前向传播:输出层 y_pred 的计算 [需要补全 None 代表部分的代码] 
         '''  
-        self.z_3 = None
-        self.y_pred = None
+        self.z_3 = self.a_2 @ self.weights_3 + self.bias_3
+        self.y_pred = softmax(self.z_3)
 
         return self.y_pred
     
@@ -254,10 +257,10 @@ class LinearNeuralNetwork:
             [需要补全 None 代表部分的代码] 
         '''
         # 计算误差项 e_3
-        e_3 = None
+        e_3 = y_pred - y
         # self.weights_3, self.bias_3 参数梯度的计算
-        grad_weights_3 = None
-        bias_weights_3 = None
+        grad_weights_3 = self.a_2.T @ e_3 / batch_size
+        bias_weights_3 = np.sum(e_3, axis=0, keepdims=True) / batch_size
 
 
         '''
@@ -265,10 +268,10 @@ class LinearNeuralNetwork:
             [需要补全 None 代表部分的代码] 
         '''
         # 计算误差项 e_2
-        e_2 = None
+        e_2 = e_3 @ self.weights_3.T
         # self.weights_2, self.bias_2 参数梯度的计算
-        grad_weights_2 = None
-        grad_bias_2 = None
+        grad_weights_2 = self.a_1.T @ e_2 / batch_size
+        grad_bias_2 = np.sum(e_2, axis=0, keepdims=True) / batch_size
 
         
         '''
@@ -276,18 +279,18 @@ class LinearNeuralNetwork:
             [需要补全 None 代表部分的代码] 
         '''
         # 计算误差项 e_1
-        e_1 = None
+        e_1 = e_2 @ self.weights_2.T
         # self.weights_1, self.bias_1 参数梯度的计算
-        grad_weights_1 = None
-        grad_bias_1 = None
+        grad_weights_1 = X.T @ e_1 / batch_size
+        grad_bias_1 = np.sum(e_1, axis=0, keepdims=True) / batch_size
 
         # 梯度下降，更新网络参数
-        self.weights_3 -= None
-        self.bias_3 -= None
-        self.weights_2 -= None
-        self.bias_2 -= None
-        self.weights_1 -= None
-        self.bias_1 -= None
+        self.weights_3 -= grad_weights_3 * learning_rate
+        self.bias_3 -= bias_weights_3 * learning_rate
+        self.weights_2 -= grad_weights_2 * learning_rate
+        self.bias_2 -= grad_bias_2 * learning_rate
+        self.weights_1 -= grad_weights_1 * learning_rate
+        self.bias_1 -= grad_bias_1 * learning_rate
 
 
     def train(self, X, y, epochs, learning_rate):
@@ -361,3 +364,22 @@ predictions = nn_linear.forward(X_test)
 predicted_classes = np.argmax(predictions, axis=1)
 accuracy = np.mean(predicted_classes == y_test)
 print(f"线性模型测试准确率: {accuracy:.2f}")
+
+# 运行结果
+'''
+python experiment_bp.py linear
+非线性模型测试准确率: 1.00
+线性模型测试准确率: 1.00
+
+python experiment_bp.py nonlinear
+非线性模型测试准确率: 0.99
+线性模型测试准确率: 0.57
+'''
+
+# 不同数据分布时的效果差异性的总结
+'''
+1. 在线性可分数据上，线性网络和非线性网络都能达到较高准确率。
+2. 在线性不可分数据上，带 ReLU 的非线性网络准确率显著高于纯线性网络。
+3. 原因在于线性网络多层线性变换可等价为一层线性变换，表达能力有限；
+    非线性激活函数引入了非线性决策边界，能够拟合更复杂的数据分布。
+'''
