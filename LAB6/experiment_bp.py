@@ -131,7 +131,6 @@ class ReluNeuralNetwork:
 
     def forward(self, X):
         
-        # 使用公式计算a_1, a_2, y_pred，并将它们保存在 self.a_1, self.a_2, self.y_pred 中，供后续反向传播使用
         '''
         前向传播:第一隐藏层激活 a_1 的计算 [代码已经给出]
         '''
