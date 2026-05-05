@@ -199,7 +199,7 @@ def batch_melspectrogram(waveforms, mel_transform, device):
 
 # ====== 训练 ======
 
-num_epochs = 10
+num_epochs = 20
 mel_transform = create_mel_transform().to(device)  # 变换也在 GPU 上
 
 for epoch in range(num_epochs):
