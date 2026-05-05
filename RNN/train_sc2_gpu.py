@@ -124,7 +124,7 @@ def collate_fn(batch):
 
 # ====== 训练参数 ======
 
-batch_size = 512  # 增大 batch，提高 GPU 利用率
+batch_size = 256  # 减小 batch，提高准确率
 
 train_loader = DataLoader(
     train_set, batch_size=batch_size, shuffle=True,
