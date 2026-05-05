@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 import torchaudio  # 仅用于 MelSpectrogram 变换，不用于音频加载
-import librosa
+import soundfile as sf
 import os
 import time
 import subprocess
@@ -24,7 +24,7 @@ def set_seed(seed):
 seed = 42
 set_seed(seed)
 
-# 自定义数据集：使用 librosa 加载音频，避免 torchcodec 依赖
+# 自定义数据集：使用 soundfile 加载音频，避免 torchcodec 依赖
 class SpeechCommandsDataset(Dataset):
     def __init__(self, data_dir, subset="training"):
         self.data_dir = data_dir
@@ -53,9 +53,12 @@ class SpeechCommandsDataset(Dataset):
         return len(self.files)
     def __getitem__(self, idx):
         path = self.files[idx]
-        # 用 librosa 加载音频（返回 numpy 数组）
-        waveform, sr = librosa.load(path, sr=16000, mono=True)
-        waveform = torch.from_numpy(waveform).unsqueeze(0).float()  # (1, T)
+        # 用 soundfile 加载音频
+        waveform, sr = sf.read(path)
+        waveform = torch.from_numpy(waveform).float()  # (T,)
+        if waveform.dim() > 1:  # 多声道 -> 单声道
+            waveform = waveform.mean(dim=1)
+        waveform = waveform.unsqueeze(0)  # (1, T)
         # 标签来自父目录名
         label = os.path.basename(os.path.dirname(path))
         return waveform, sr, label, "", 0
