@@ -126,7 +126,7 @@ train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, collat
 val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
 test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
 
-# 定义纯RNN模型
+# 定义模型
 class SimpleRNNModel(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, num_classes, dropout_rate=0.2):
         super(SimpleRNNModel, self).__init__()
