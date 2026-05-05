@@ -84,5 +84,12 @@ processed_data/
 *.pt
 *.pth
 
+*.zip
+*.tar.gz
+
+# Lab Files
+
+g_0612_0.601
+
 # If needed, keep only tiny examples via explicit whitelist patterns, e.g.:
 # !data/sample.csv
