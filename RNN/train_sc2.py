@@ -1,18 +1,19 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
-import torchaudio
-from torch.utils.data import Dataset
+from torch.utils.data import DataLoader, Dataset
+import torchaudio  # 仅用于 MelSpectrogram 变换，不用于音频加载
+import librosa
 import os
 import time
 import subprocess
-from torchaudio.datasets import SPEECHCOMMANDS
 from datetime import datetime
+
 result = subprocess.run(['nvidia-smi'], capture_output=True, text=True, check=True)
 output = result.stdout
 print(output)
 print(torch.cuda.is_available())
+
 def set_seed(seed):
     torch.manual_seed(seed)
     if torch.cuda.is_available():
@@ -20,34 +21,52 @@ def set_seed(seed):
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
-# 设置种子值
 seed = 42
 set_seed(seed)
-# 定义一个辅助类，用于筛选出指定子集的数据
-class SubsetSC(SPEECHCOMMANDS):
-    def __init__(self, subset: str = None):
-        super().__init__("/ghome/gpub/SpeechCommands-sub/", download=False)
 
+# 自定义数据集：使用 librosa 加载音频，避免 torchcodec 依赖
+class SpeechCommandsDataset(Dataset):
+    def __init__(self, data_dir, subset="training"):
+        self.data_dir = data_dir
+        # 扫描所有 .wav 文件
+        all_files = []
+        for root, _, files in os.walk(data_dir):
+            for f in files:
+                if f.endswith(".wav"):
+                    all_files.append(os.path.join(root, f))
+        # 加载划分列表
         def load_list(filename):
-            filepath = os.path.join(self._path, filename)
-            with open(filepath) as fileobj:
-                return [os.path.join(self._path, line.strip()) for line in fileobj]
-
+            filepath = os.path.join(data_dir, filename)
+            with open(filepath) as f:
+                return {os.path.normpath(os.path.join(data_dir, line.strip())) for line in f}
+        val_list = load_list("validation_list.txt") if os.path.exists(os.path.join(data_dir, "validation_list.txt")) else set()
+        test_list = load_list("testing_list.txt") if os.path.exists(os.path.join(data_dir, "testing_list.txt")) else set()
+        # 按子集划分
         if subset == "validation":
-            self._walker = load_list("validation_list.txt")
+            self.files = [f for f in all_files if os.path.normpath(f) in val_list]
         elif subset == "testing":
-            self._walker = load_list("testing_list.txt")
-        elif subset == "training":
-            excludes = load_list("validation_list.txt") + load_list("testing_list.txt")
-            excludes = set(excludes)
-            self._walker = [w for w in self._walker if w not in excludes]
+            self.files = [f for f in all_files if os.path.normpath(f) in test_list]
+        else:  # training
+            excludes = val_list | test_list
+            self.files = [f for f in all_files if os.path.normpath(f) not in excludes]
+    def __len__(self):
+        return len(self.files)
+    def __getitem__(self, idx):
+        path = self.files[idx]
+        # 用 librosa 加载音频（返回 numpy 数组）
+        waveform, sr = librosa.load(path, sr=16000, mono=True)
+        waveform = torch.from_numpy(waveform).unsqueeze(0).float()  # (1, T)
+        # 标签来自父目录名
+        label = os.path.basename(os.path.dirname(path))
+        return waveform, sr, label, "", 0
 
-
+# 数据集根目录
+SC_DIR = os.path.join(os.path.dirname(__file__), "SpeechCommands-sub", "SpeechCommands", "speech_commands_v0.02")
 
 # 加载训练集、验证集和测试集
-train_set = SubsetSC("training")
-val_set = SubsetSC("validation")
-test_set = SubsetSC("testing")
+train_set = SpeechCommandsDataset(SC_DIR, "training")
+val_set = SpeechCommandsDataset(SC_DIR, "validation")
+test_set = SpeechCommandsDataset(SC_DIR, "testing")
 
 # 获取所有的命令词标签
 labels_all = sorted(list(set(datapoint[2] for datapoint in train_set)))
