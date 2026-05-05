@@ -190,9 +190,6 @@ model.to(device)
 # 设置训练的轮数
 num_epochs = 20
 
-# 学习率调度器：余弦退火
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
-
 for epoch in range(num_epochs):
     model.train()
     running_loss = 0.0
@@ -235,10 +232,6 @@ for epoch in range(num_epochs):
             
 
     print(f'Validation Accuracy: {100 * correct / total}%')
-    print(f'  LR: {scheduler.get_last_lr()[0]:.6f}')
-
-    # 更新学习率
-    scheduler.step()
 
 # 在测试集上评估模型
 model.eval()
