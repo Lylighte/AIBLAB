@@ -115,7 +115,8 @@ class SimpleRNNModel(nn.Module):
         # input_size: 输入特征的维度（梅尔频谱的特征维度）
         # hidden_size: RNN 隐藏状态的维度
         # num_layers: RNN 的层数
-        self.gru = nn.GRU(input_size, hidden_size, num_layers, batch_first=True)
+        # self.gru = TODO
+        self.rnn = nn.RNN(input_size, hidden_size, num_layers, batch_first=True, dropout=dropout_rate)
         # 添加 Batch Normalization 层
         self.bn = nn.BatchNorm1d(hidden_size)
         # 添加 Dropout 层
@@ -129,7 +130,8 @@ class SimpleRNNModel(nn.Module):
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
 
         # 通过 GRU 层进行前向传播
-        out, _ = self.gru(x, h0)
+        # out, _ = self.gru(x, h0)
+        out, _ = self.rnn(x, h0)
 
         # 取最后一个时间步的输出
         out = out[:, -1, :]
