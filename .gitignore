@@ -90,6 +90,7 @@ processed_data/
 # Lab Files
 
 g_0612_0.601
+SpeechCommands-sub/
 
 # If needed, keep only tiny examples via explicit whitelist patterns, e.g.:
 # !data/sample.csv

@@ -111,13 +111,18 @@ class SimpleRNNModel(nn.Module):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         # 使用 GRU 替代简单 RNN
-        self.gru = ???
+        # 参数说明
+        # input_size: 输入特征的维度（梅尔频谱的特征维度）
+        # hidden_size: RNN 隐藏状态的维度
+        # num_layers: RNN 的层数
+        self.gru = nn.GRU(input_size, hidden_size, num_layers, batch_first=True)
         # 添加 Batch Normalization 层
         self.bn = nn.BatchNorm1d(hidden_size)
         # 添加 Dropout 层
         self.dropout = nn.Dropout(dropout_rate)
         # 定义全连接层，用于输出分类结果
-        self.fc = ???
+        # num_classes: 分类的类别数（命令词的数量）
+        self.fc = nn.Linear(hidden_size, num_classes)
 
     def forward(self, x):
         # 初始化隐藏状态
