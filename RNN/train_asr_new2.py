@@ -54,14 +54,12 @@ def cer_single(reference, hypothesis):
 
 def cer_multiple(refs, hyps):
     total_characters = 0
-    weighted_cer_sum = 0
+    total_distance = 0
     for ref, hyp in zip(refs, hyps):
-        cer = cer_single(ref[0].cpu().numpy(), hyp[0].cpu().numpy())
-        
-#   补充代码，此处的cer_single作用是求出的是两个句子之间的cer
-#   此函数的输入refs和hyps是两个列表，列表的每一个元素都是句子
-#   注意cer的定义是 修改数/参考句子总长度
-    return 1
+        distance = levenshtein_distance(ref[0].cpu().numpy(), hyp[0].cpu().numpy())
+        total_distance += distance
+        total_characters += len(ref[0].cpu().numpy())
+    return total_distance / total_characters if total_characters > 0 else 0.0
 def save_checkpoint(filepath, obj):
     print("Saving checkpoint to {}".format(filepath))
     torch.save(obj, filepath)
@@ -350,7 +348,8 @@ for epoch in range(epochs):
         optimizer.zero_grad()
         Y_pred = model(fea.cuda())
         Y_pred = Y_pred.log_softmax(2)
-#       完成损失函数代码以使代码正常运行，可参考nn.CTCLoss()的输入参数定义
+        # 补全
+        loss = criterion(Y_pred, labels.cuda(), torch.tensor(input_lengths), torch.tensor(label_lengths))
         loss.backward()
         optimizer.step()
         train_loss += loss.item()
@@ -379,14 +378,14 @@ for epoch in range(epochs):
           non_blank_sequence = [num for num in Y_pred]
           final_sequence = []
           for i, num in enumerate(non_blank_sequence):
-                      if i == 0 or (num != non_blank_sequence[i - 1]&num!=0):
-                          final_sequence.append(num)
+              if i == 0 or (num != non_blank_sequence[i - 1] and num != 0):
+                  final_sequence.append(num)
           new_final_sequence = []
           for t in final_sequence:
               if t.dim() == 0:
                   t = t.unsqueeze(0)  # 将零维张量转换为一维张量
               new_final_sequence.append(t)
-  
+
           result_tensor = torch.cat(new_final_sequence, dim=0)
           devlabels.append(labels)
           devpre.append(result_tensor.unsqueeze(0))
@@ -400,4 +399,33 @@ for epoch in range(epochs):
       error_rate = cer_multiple(devlabels, devpre)
       print(f"字错误率 (CER): {error_rate * 100:.2f}%")
     
-# 需要补充在测试集测量CER的代码
+# ========== 测试集 CER 评估 ==========
+testlabels = []
+testpre = []
+model.eval()
+for batch in test_dataloader:
+    fea, labels, input_lengths, label_lengths = batch
+    with torch.no_grad():
+        Y_pred = model(fea.cuda())
+    Y_pred = Y_pred.permute(1, 0, 2)
+    Y_pred = torch.argmax(Y_pred, dim=2).squeeze(0)
+    non_blank_sequence = [num for num in Y_pred]
+    final_sequence = []
+    for i, num in enumerate(non_blank_sequence):
+        if i == 0 or (num != non_blank_sequence[i - 1] and num != 0):
+            final_sequence.append(num)
+    new_final_sequence = []
+    for t in final_sequence:
+        if t.dim() == 0:
+            t = t.unsqueeze(0)
+        new_final_sequence.append(t)
+    result_tensor = torch.cat(new_final_sequence, dim=0)
+    testlabels.append(labels)
+    testpre.append(result_tensor.unsqueeze(0))
+
+final_text = ''.join([id2char[num.item()] for num in final_sequence])
+print("测试集预测文本:", final_text)
+true_label = ''.join([id2char[num.item()] for num in labels[0]])
+print("测试集真实文本:", true_label)
+test_cer = cer_multiple(testlabels, testpre)
+print(f"测试集字错误率 (CER): {test_cer * 100:.2f}%")
