@@ -85,7 +85,7 @@ class ThchsData(Dataset):
         for path in text_paths:
             with open(path, 'r', encoding='utf8') as fr:
                 lines = fr.readlines()
-                line = lines[0].strip('\n').replace(' ', '').replace('../data','/ghome/gpub/data_thchs30/data') # 注: 需要修改此处路径
+                line = lines[0].strip('\n').replace(' ', '').replace('../data', os.path.join(os.path.dirname(__file__), 'data_thchs30', 'data').replace('\\', '/'))
                 with open(line, 'r', encoding='utf8') as fr2:
                     lines2 = fr2.readlines()
                     self.texts.append(lines2[0].strip('\n').replace(' ', ''))
@@ -99,8 +99,9 @@ class ThchsData(Dataset):
         chars = [char[0] for char in chars]
         
         # print(len(chars), chars[:100])
-        self.char2id =torch.load('/ghome/gpub/data_thchs30/cha2id.pth') # 注: 需要修改此处路径
-        self.id2char =torch.load('/ghome/gpub/data_thchs30/id2char.pth') # 注: 需要修改此处路径
+        base_dir = os.path.dirname(__file__)
+        self.char2id = torch.load(os.path.join(base_dir, 'cha2id.pth'))
+        self.id2char = torch.load(os.path.join(base_dir, 'id2char.pth'))
         new_char2id = {char: id + 1 for char, id in self.char2id.items()}
         self.char2id = new_char2id
 
@@ -114,6 +115,9 @@ class ThchsData(Dataset):
         self.eos_index=len(self.char2id)
         self.char2id['<eos>'] = self.eos_index
         self.id2char[self.eos_index]='<eos>'
+        self.unk_index=len(self.char2id)
+        self.char2id['<unk>'] = self.unk_index
+        self.id2char[self.unk_index]='<unk>'
         # print(len(self.char2id))
         # exit()
         # self.char2id = {c: i for i, c in enumerate(chars)}
@@ -125,24 +129,31 @@ class ThchsData(Dataset):
     
     def __getitem__(self, idx):
         wav_path = self.paths[idx]
-        # wav_path = os.path.join(self.wav_dir, wav_file)
-        # 加载音频
-        waveform, sample_rate = torchaudio.load(wav_path)
+        # 用 soundfile 加载音频（绕过 torchaudio 2.11+ 强制依赖 torchcodec 的问题）
+        import soundfile as sf
+        waveform, sample_rate = sf.read(wav_path)
+        waveform = torch.from_numpy(waveform).float()
+        if waveform.dim() > 1:
+            waveform = waveform.mean(dim=1)  # 多声道转单声道
+        waveform = waveform.unsqueeze(0)     # (1, T)
         
         # 如果采样率不符合要求，进行重采样
         if sample_rate != self.sample_rate:
             resampler = Resample(sample_rate, self.sample_rate)
             waveform = resampler(waveform)
-        # print(transcription)
-        # 应用预处理操作（如Mel Spectrogram）
-        path1=wav_path.replace('train/','mfcc/').replace('wav','npy').replace('dev/','mfcc/').replace('test/','mfcc/')
-        fea=torch.FloatTensor(np.load(path1))
+        # 从 wav 路径构造对应的 mfcc npy 路径
+        # .../data_thchs30/train/A7_49.wav → .../data_thchs30/mfcc/train/A7_49.npy
+        wav_path_norm = wav_path.replace('\\', '/')
+        path1 = (wav_path_norm
+                 .replace('/data_thchs30/', '/data_thchs30/mfcc/')
+                 .replace('.wav', '.npy'))
+        fea = torch.FloatTensor(np.load(path1))
         # phone=torch.LongTensor([self.char2id[c] for c in self.texts[idx]])
         phone_list = []  # 用于存储处理后的字符表示
 
         for i in range(len(self.texts[idx])):
             char = self.texts[idx][i]
-            phone_list.append(self.char2id[char])  # 将字符映射为对应的id
+            phone_list.append(self.char2id.get(char, self.unk_index))  # 将字符映射为对应的id，未知字符用<unk>
             
             # 如果是最后一个字符，则跳出循环
             if i < len(self.texts[idx]) - 1 and self.texts[idx][i] == self.texts[idx][i + 1]:
@@ -174,15 +185,15 @@ def collate_fn(batch):
     # 找到最长文本的长度
     max_phone_len = max([len(phone) for phone in phones])
     for phone in phones:
-        label_lengths.append(len(phone)+1) 
+        label_lengths.append(len(phone)) 
     # 填充文本
     padded_phones = []
     
     max_phone_len = max([phone.size(0) for phone in phones])
     for phone in phones:
         # 假设文本是字符级的，可以直接填充空格
-        padding = max_phone_len - phone.size(0)+1
-        padded_phones.append(torch.nn.functional.pad(phone, (0, padding), value=2666))
+        padding = max_phone_len - phone.size(0)
+        padded_phones.append(torch.nn.functional.pad(phone, (0, padding), value=0))
     
     # 转换为张量
     padded_fea = torch.stack(padded_feas, dim=0)
@@ -229,23 +240,6 @@ class ResBlock(nn.Module):
         h0 = hf * hg
         ha = torch.tanh(self.bn2(self.conv2(h0)))
         hs = torch.tanh(self.bn2(self.conv2(h0)))
-        return ha + x, hs
-
-class ResBlock(nn.Module):
-    def __init__(self, filters, kernel_size, dilation_rate):
-        super(ResBlock, self).__init__()
-        self.conv1 = nn.Conv1d(filters, filters, kernel_size, stride=1, padding='same', dilation=dilation_rate)
-        self.bn1 = nn.BatchNorm1d(filters)
-        self.conv2 = nn.Conv1d(filters, filters, 1, stride=1, padding='same')
-        self.bn2 = nn.BatchNorm1d(filters)
-        self.leaky_relu = nn.LeakyReLU(0.2)
-
-    def forward(self, x):
-        hf = self.leaky_relu(self.bn1(self.conv1(x)))
-        hg = self.leaky_relu(self.bn1(self.conv1(x)))
-        h0 = hf * hg
-        ha = self.leaky_relu(self.bn2(self.conv2(h0)))
-        hs = self.leaky_relu(self.bn2(self.conv2(h0)))
         return ha + x, hs
 
 class ASRModel(nn.Module):
@@ -296,8 +290,9 @@ class ASRModel(nn.Module):
 epochs = 10
 num_blocks = 3
 filters = 128
-char2id=torch.load('/ghome/gpub/data_thchs30/cha2id.pth')
-id2char=torch.load('/ghome/gpub/data_thchs30/id2char.pth')
+base_dir = os.path.dirname(__file__)
+char2id=torch.load(os.path.join(base_dir, 'cha2id.pth'))
+id2char=torch.load(os.path.join(base_dir, 'id2char.pth'))
 new_char2id = {char: id + 1 for char, id in char2id.items()}
 char2id = new_char2id
 
@@ -307,12 +302,15 @@ id2char = new_id2char
 id2char[0]='<blank>'
 index=len(id2char)
 id2char[index]='<eos>'
+unk_index=index+1
+id2char[unk_index]='<unk>'
 char2id['<blank>']=0
 char2id['<eos>']=index
+char2id['<unk>']=unk_index
 num_classes = len(char2id)
 mfcc_dim = 13
 model = ASRModel(mfcc_dim, num_blocks, filters, num_classes).cuda()
-st=torch.load('/ghome/gpub/data_thchs30/g_0612_0.601')['model']
+st=torch.load(os.path.join(base_dir, 'g_0612_0.601'))['model']
 # for name, param in model.named_parameters():
 #     if name in st:
 #         param.requires_grad = False
@@ -326,15 +324,15 @@ train_losses = []
 valid_losses = []
 batch_size = 32
 
-train_path='/ghome/gpub/data_thchs30/train/*.trn'
+train_path=os.path.join(base_dir, 'data_thchs30', 'train', '*.trn')
 dataset = ThchsData(train_path, sample_rate=16000)
 dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
 
-dev_path='/ghome/gpub/data_thchs30/dev/*.trn'
+dev_path=os.path.join(base_dir, 'data_thchs30', 'dev', '*.trn')
 dataset = ThchsData(dev_path, sample_rate=16000)
 dev_dataloader = DataLoader(dataset, batch_size=1, shuffle=False, collate_fn=collate_fn)
 
-test_path='/ghome/gpub/data_thchs30/test/*.trn'
+test_path=os.path.join(base_dir, 'data_thchs30', 'test', '*.trn')
 dataset = ThchsData(test_path, sample_rate=16000)
 test_dataloader = DataLoader(dataset, batch_size=1, shuffle=False, collate_fn=collate_fn)
 
@@ -356,7 +354,7 @@ for epoch in range(epochs):
         Y_pred=Y_pred.permute(1, 0, 2)
         Y_pred=torch.argmax(Y_pred, dim=2).squeeze(0)
         non_blank_sequence = [num for num in Y_pred[0]]
-    train_loss /= len(dataloader) // batch_size
+    train_loss /= len(dataloader)
     train_losses.append(train_loss)
     # torch.save(model.state_dict(),'final_asr.pth')
     time_end=time.time()

@@ -93,6 +93,7 @@ processed_data/
 g_0612_0.601
 SpeechCommands-sub/
 data_thchs30/
+RNN/RNN/
 
 # If needed, keep only tiny examples via explicit whitelist patterns, e.g.:
 # !data/sample.csv
