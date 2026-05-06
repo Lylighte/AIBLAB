@@ -86,11 +86,13 @@ processed_data/
 
 *.zip
 *.tar.gz
+*.tgz
 
 # Lab Files
 
 g_0612_0.601
 SpeechCommands-sub/
+data_thchs30/
 
 # If needed, keep only tiny examples via explicit whitelist patterns, e.g.:
 # !data/sample.csv
