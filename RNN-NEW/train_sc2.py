@@ -26,7 +26,8 @@ set_seed(seed)
 # 定义一个辅助类，用于筛选出指定子集的数据
 class SubsetSC(SPEECHCOMMANDS):
     def __init__(self, subset: str = None):
-        super().__init__("/ghome/gpub/SpeechCommands-sub/", download=False) # TODO: 改成自己的数据集所在位置
+        # super().__init__("/ghome/gpub/SpeechCommands-sub/", download=False) # TODO: 改成自己的数据集所在位置
+        super().__init__("/mnt/c/Users/Lighte/GitHub/AIBLAB/RNN-NEW/SpeechCommands-sub/", download=False)
 
         def load_list(filename):
             filepath = os.path.join(self._path, filename)
