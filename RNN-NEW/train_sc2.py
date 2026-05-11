@@ -111,19 +111,21 @@ class SimpleRNNModel(nn.Module):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         # 使用 GRU 替代简单 RNN
-        self.gru = ???
+        # self.rnn = nn.RNN(input_size, hidden_size, num_layers, batch_first=True, dropout=dropout_rate)
+        self.gru = nn.GRU(input_size, hidden_size, num_layers, batch_first=True, dropout=dropout_rate)
         # 添加 Batch Normalization 层
         self.bn = nn.BatchNorm1d(hidden_size)
         # 添加 Dropout 层
         self.dropout = nn.Dropout(dropout_rate)
         # 定义全连接层，用于输出分类结果
-        self.fc = ???
+        self.fc = nn.Linear(hidden_size, num_classes)
 
     def forward(self, x):
         # 初始化隐藏状态
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
 
         # 通过 GRU 层进行前向传播
+        # out, _ = self.rnn(x, h0)
         out, _ = self.gru(x, h0)
 
         # 取最后一个时间步的输出
