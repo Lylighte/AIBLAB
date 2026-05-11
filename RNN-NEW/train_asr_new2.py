@@ -57,11 +57,9 @@ def cer_multiple(refs, hyps):
     weighted_cer_sum = 0
     for ref, hyp in zip(refs, hyps):
         cer = cer_single(ref[0].cpu().numpy(), hyp[0].cpu().numpy())
-        
-#   补充代码，此处的cer_single作用是求出的是两个句子之间的cer
-#   此函数的输入refs和hyps是两个列表，列表的每一个元素都是句子
-#   注意cer的定义是 修改数/参考句子总长度
-    return 1
+        weighted_cer_sum += cer * len(ref[0])
+        total_characters += len(ref[0])
+    return weighted_cer_sum / total_characters if total_characters > 0 else 0
 def save_checkpoint(filepath, obj):
     print("Saving checkpoint to {}".format(filepath))
     torch.save(obj, filepath)
@@ -195,7 +193,7 @@ def collate_fn(batch):
     # print(padded_fea.shape)
     padded_phones = torch.stack(padded_phones, dim=0)
     
-    return padded_fea, padded_phones,input_lengths,label_lengths
+    return padded_fea, padded_phones, torch.tensor(input_lengths), torch.tensor(label_lengths)
 
 
 
@@ -221,22 +219,6 @@ class SimplifiedASRModel(nn.Module):
         y_pred = y_pred.permute(1, 0, 2)
 
         return y_pred
-class ResBlock(nn.Module):
-    def __init__(self, filters, kernel_size, dilation_rate):
-        super(ResBlock, self).__init__()
-        self.conv1 = nn.Conv1d(filters, filters, kernel_size, stride=1, padding='same', dilation=dilation_rate)
-        self.bn1 = nn.BatchNorm1d(filters)
-        self.conv2 = nn.Conv1d(filters, filters, 1, stride=1, padding='same')
-        self.bn2 = nn.BatchNorm1d(filters)
-
-    def forward(self, x):
-        hf = torch.tanh(self.bn1(self.conv1(x)))
-        hg = torch.sigmoid(self.bn1(self.conv1(x)))
-        h0 = hf * hg
-        ha = torch.tanh(self.bn2(self.conv2(h0)))
-        hs = torch.tanh(self.bn2(self.conv2(h0)))
-        return ha + x, hs
-
 class ResBlock(nn.Module):
     def __init__(self, filters, kernel_size, dilation_rate):
         super(ResBlock, self).__init__()
@@ -354,14 +336,11 @@ for epoch in range(epochs):
         optimizer.zero_grad()
         Y_pred = model(fea.cuda())
         Y_pred = Y_pred.log_softmax(2)
-#       完成损失函数代码以使代码正常运行，可参考nn.CTCLoss()的输入参数定义
+        loss = criterion(Y_pred, labels.cuda(), input_lengths, label_lengths)
         loss.backward()
         optimizer.step()
         train_loss += loss.item()
-        Y_pred=Y_pred.permute(1, 0, 2)
-        Y_pred=torch.argmax(Y_pred, dim=2).squeeze(0)
-        non_blank_sequence = [num for num in Y_pred[0]]
-    train_loss /= len(dataloader) // batch_size
+    train_loss /= len(dataloader)
     train_losses.append(train_loss)
     # torch.save(model.state_dict(),'final_asr.pth')
     time_end=time.time()
@@ -373,8 +352,8 @@ for epoch in range(epochs):
     if (epoch+1)%1==0:
       devlabels=[]
       devpre=[]
+      model.eval()
       for batch in dev_dataloader:
-          model.eval()
           fea, labels, input_lengths, label_lengths = batch
           with torch.no_grad():
               Y_pred = model(fea.cuda() )
@@ -391,7 +370,6 @@ for epoch in range(epochs):
                   t = t.unsqueeze(0)  # 将零维张量转换为一维张量
               new_final_sequence.append(t)
   
-          result_tensor = torch.cat(new_final_sequence, dim=0)
           result_tensor = torch.cat(new_final_sequence, dim=0)
           true_ids = labels[0].tolist()
           if index in true_ids:
@@ -414,4 +392,38 @@ for epoch in range(epochs):
       error_rate = cer_multiple(devlabels, devpre)
       print(f"字错误率 (CER): {error_rate * 100:.2f}%")
     
-# 需要补充在测试集测量CER的代码
+testlabels = []
+testpre = []
+model.eval()
+for batch in test_dataloader:
+    fea, labels, input_lengths, label_lengths = batch
+    with torch.no_grad():
+        Y_pred = model(fea.cuda())
+    Y_pred = Y_pred.permute(1, 0, 2)
+    Y_pred = torch.argmax(Y_pred, dim=2).squeeze(0)
+    non_blank_sequence = [num for num in Y_pred]
+    final_sequence = []
+    for i, num in enumerate(non_blank_sequence):
+        if i == 0 or (num != non_blank_sequence[i - 1] and num != 0):
+            final_sequence.append(num)
+    new_final_sequence = []
+    for t in final_sequence:
+        if t.dim() == 0:
+            t = t.unsqueeze(0)
+        new_final_sequence.append(t)
+
+    result_tensor = torch.cat(new_final_sequence, dim=0)
+    true_ids = labels[0].tolist()
+    if index in true_ids:
+        true_ids = true_ids[:true_ids.index(index)]
+    true_ids = [x for x in true_ids if x != 0 and x != index]
+    testlabels.append(torch.tensor(true_ids).unsqueeze(0))
+
+    pred_ids = result_tensor.tolist()
+    if index in pred_ids:
+        pred_ids = pred_ids[:pred_ids.index(index)]
+    pred_ids = [x for x in pred_ids if x != 0 and x != index]
+    testpre.append(torch.tensor(pred_ids).unsqueeze(0))
+
+test_error_rate = cer_multiple(testlabels, testpre)
+print(f"测试集字错误率 (CER): {test_error_rate * 100:.2f}%")
