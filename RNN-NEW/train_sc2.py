@@ -27,7 +27,7 @@ set_seed(seed)
 class SubsetSC(SPEECHCOMMANDS):
     def __init__(self, subset: str = None):
         # super().__init__("/ghome/gpub/SpeechCommands-sub/", download=False) # TODO: 改成自己的数据集所在位置
-        super().__init__("/mnt/c/Users/Lighte/GitHub/AIBLAB/RNN-NEW/SpeechCommands-sub/", download=False)
+        super().__init__("/home/lighte/model/SpeechCommands-sub/", download=False)
 
         def load_list(filename):
             filepath = os.path.join(self._path, filename)
@@ -101,9 +101,9 @@ def collate_fn(batch):
 # 设置批量大小
 batch_size = 256
 # 创建训练集、验证集和测试集的数据加载器
-train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
-val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
-test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
+train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, collate_fn=collate_fn, num_workers=4)
+val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False, collate_fn=collate_fn, num_workers=4)
+test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False, collate_fn=collate_fn, num_workers=4)
 
 # 定义纯RNN模型
 class SimpleRNNModel(nn.Module):
