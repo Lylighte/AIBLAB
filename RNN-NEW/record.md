@@ -1,3 +1,71 @@
+LAB1 - 日志
+
+将 epochs 改为 20，其他参数不变：
+
+第 1 轮花费了 0 分 5.06 秒
+Epoch 1/20, Loss: 2.9136657893657683
+Validation Accuracy: 31.4%
+第 2 轮花费了 0 分 5.04 秒
+Epoch 2/20, Loss: 1.971019384264946
+Validation Accuracy: 55.6%
+第 3 轮花费了 0 分 5.11 秒
+Epoch 3/20, Loss: 1.4178818315267563
+Validation Accuracy: 60.2%
+第 4 轮花费了 0 分 4.86 秒
+Epoch 4/20, Loss: 1.108409871160984
+Validation Accuracy: 65.4%
+第 5 轮花费了 0 分 4.83 秒
+Epoch 5/20, Loss: 0.9002241179347038
+Validation Accuracy: 70.0%
+第 6 轮花费了 0 分 4.87 秒
+Epoch 6/20, Loss: 0.7820025496184826
+Validation Accuracy: 74.0%
+第 7 轮花费了 0 分 4.95 秒
+Epoch 7/20, Loss: 0.6036096379160881
+Validation Accuracy: 75.0%
+第 8 轮花费了 0 分 4.86 秒
+Epoch 8/20, Loss: 0.5038888260722161
+Validation Accuracy: 73.4%
+第 9 轮花费了 0 分 5.06 秒
+Epoch 9/20, Loss: 0.4997289590537548
+Validation Accuracy: 76.8%
+第 10 轮花费了 0 分 5.08 秒
+Epoch 10/20, Loss: 0.4644449032843113
+Validation Accuracy: 78.2%
+第 11 轮花费了 0 分 5.10 秒
+Epoch 11/20, Loss: 0.44889952540397643
+Validation Accuracy: 76.0%
+第 12 轮花费了 0 分 5.02 秒
+Epoch 12/20, Loss: 0.34052977077662944
+Validation Accuracy: 75.6%
+第 13 轮花费了 0 分 4.87 秒
+Epoch 13/20, Loss: 0.25376680977642535
+Validation Accuracy: 77.4%
+第 14 轮花费了 0 分 4.76 秒
+Epoch 14/20, Loss: 0.2627069439738989
+Validation Accuracy: 76.0%
+第 15 轮花费了 0 分 4.78 秒
+Epoch 15/20, Loss: 0.19181650262326003
+Validation Accuracy: 75.6%
+第 16 轮花费了 0 分 5.00 秒
+Epoch 16/20, Loss: 0.21522165331989526
+Validation Accuracy: 79.8%
+第 17 轮花费了 0 分 4.74 秒
+Epoch 17/20, Loss: 0.21428506188094615
+Validation Accuracy: 79.2%
+第 18 轮花费了 0 分 4.76 秒
+Epoch 18/20, Loss: 0.18392211087048055
+Validation Accuracy: 80.4%
+第 19 轮花费了 0 分 5.09 秒
+Epoch 19/20, Loss: 0.16297671515494586
+Validation Accuracy: 81.4%
+第 20 轮花费了 0 分 4.83 秒
+Epoch 20/20, Loss: 0.15306699760258197
+Validation Accuracy: 80.2%
+Test Accuracy: 81.6%
+
+LAB2 - 日志
+
 (py313) PS C:\Users\USTCRAFT\Documents\GitHub\AIBLAB\RNN-NEW> python .\train_asr_local.py
 第 1 轮花费了 2 分 48.76 秒
 Epoch 1/10, Train Loss: 0.5710

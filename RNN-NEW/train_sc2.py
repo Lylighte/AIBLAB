@@ -162,7 +162,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)
 
 # 设置训练的轮数
-num_epochs = 10
+num_epochs = 20
 for epoch in range(num_epochs):
     model.train()
     running_loss = 0.0
