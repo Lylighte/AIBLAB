@@ -7,12 +7,10 @@ import torch.nn.functional as F
 import re
 import os
 import soundfile as sf
-import torchaudio
 from torch.utils.data import Dataset, DataLoader
 import glob
 import time
 from torch.amp import GradScaler, autocast
-from torchaudio.transforms import MelSpectrogram, Resample
 def levenshtein_distance(ref, hyp):
     """
     计算两个字符串的 Levenshtein 距离
@@ -128,15 +126,17 @@ class ThchsData(Dataset):
         wav_path = self.paths[idx]
         # wav_path = os.path.join(self.wav_dir, wav_file)
         # 加载音频
-        waveform, sample_rate = torchaudio.load(wav_path)
-        
+        waveform, sample_rate = sf.read(wav_path)
+        waveform = torch.from_numpy(waveform).float().unsqueeze(0)
+
         # 如果采样率不符合要求，进行重采样
         if sample_rate != self.sample_rate:
-            resampler = Resample(sample_rate, self.sample_rate)
-            waveform = resampler(waveform)
+            waveform_np = waveform.squeeze(0).numpy()
+            waveform_np = librosa.resample(waveform_np, orig_sr=sample_rate, target_sr=self.sample_rate)
+            waveform = torch.from_numpy(waveform_np).float().unsqueeze(0)
         # print(transcription)
         # 应用预处理操作（如Mel Spectrogram）
-        path1=wav_path.replace('train/','mfcc/').replace('wav','npy').replace('dev/','mfcc/').replace('test/','mfcc/')
+        path1 = os.path.join('data_thchs30', 'mfcc', os.path.basename(wav_path).replace('.wav', '.npy'))
         fea=torch.FloatTensor(np.load(path1))
         # phone=torch.LongTensor([self.char2id[c] for c in self.texts[idx]])
         phone_list = []  # 用于存储处理后的字符表示
@@ -281,149 +281,155 @@ class ASRModel(nn.Module):
 
         return y_pred
 
-epochs = 10
-num_blocks = 3
-filters = 128
-char2id=torch.load('cha2id.pth')
-id2char=torch.load('id2char.pth')
-new_char2id = {char: id + 1 for char, id in char2id.items()}
-char2id = new_char2id
+if __name__ == '__main__':
+    epochs = 0
+    num_blocks = 3
+    filters = 128
+    char2id=torch.load('cha2id.pth')
+    id2char=torch.load('id2char.pth')
+    new_char2id = {char: id + 1 for char, id in char2id.items()}
+    char2id = new_char2id
 
-        # 更新 self.id2char 字典
-new_id2char = {id + 1: char for id, char in id2char.items()}
-id2char = new_id2char
-id2char[0]='<blank>'
-index=len(id2char)
-id2char[index]='<eos>'
-char2id['<blank>']=0
-char2id['<eos>']=index
-num_classes = len(char2id)
-mfcc_dim = 13
-model = ASRModel(mfcc_dim, num_blocks, filters, num_classes).cuda()
-st=torch.load('g_0612_0.601')['model']
-# for name, param in model.named_parameters():
-#     if name in st:
-#         param.requires_grad = False
-#     else:
-#         param.requires_grad = True
-model.load_state_dict(st)
-optimizer = optim.Adam(model.parameters(), lr=0.001)
-criterion = nn.CTCLoss()
+    # 更新 self.id2char 字典
+    new_id2char = {id + 1: char for id, char in id2char.items()}
+    id2char = new_id2char
+    id2char[0]='<blank>'
+    index=len(id2char)
+    id2char[index]='<eos>'
+    char2id['<blank>']=0
+    char2id['<eos>']=index
+    num_classes = len(char2id)
+    mfcc_dim = 13
+    model = ASRModel(mfcc_dim, num_blocks, filters, num_classes).cuda()
+    st=torch.load('g_0612_0.601')['model']
+    # for name, param in model.named_parameters():
+    #     if name in st:
+    #         param.requires_grad = False
+    #     else:
+    #         param.requires_grad = True
+    model.load_state_dict(st)
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    criterion = nn.CTCLoss()
 
-train_losses = []
-valid_losses = []
-batch_size = 32
+    train_losses = []
+    valid_losses = []
+    batch_size = 32
 
-train_path='data_thchs30/train/*.trn'
-dataset = ThchsData(train_path, sample_rate=16000)
-dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn, num_workers=4)
+    train_path='data_thchs30/train/*.trn'
+    dataset = ThchsData(train_path, sample_rate=16000)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn, num_workers=0)
 
-dev_path='data_thchs30/dev/*.trn'
-dataset = ThchsData(dev_path, sample_rate=16000)
-dev_dataloader = DataLoader(dataset, batch_size=1, shuffle=False, collate_fn=collate_fn, num_workers=2)
+    dev_path='data_thchs30/dev/*.trn'
+    dataset = ThchsData(dev_path, sample_rate=16000)
+    dev_dataloader = DataLoader(dataset, batch_size=1, shuffle=False, collate_fn=collate_fn, num_workers=0)
 
-test_path='data_thchs30/test/*.trn'
-dataset = ThchsData(test_path, sample_rate=16000)
-test_dataloader = DataLoader(dataset, batch_size=1, shuffle=False, collate_fn=collate_fn, num_workers=2)
+    test_path='data_thchs30/test/*.trn'
+    dataset = ThchsData(test_path, sample_rate=16000)
+    test_dataloader = DataLoader(dataset, batch_size=1, shuffle=False, collate_fn=collate_fn, num_workers=0)
 
-for epoch in range(epochs):
-    model.train()
-    train_loss = 0
-    time_start=time.time()
-    for batch in dataloader:
-        
+    for epoch in range(epochs):
+        model.train()
+        train_loss = 0
+        time_start=time.time()
+        for batch in dataloader:
+            fea, labels, input_lengths, label_lengths = batch
+            optimizer.zero_grad()
+            Y_pred = model(fea.cuda())
+            Y_pred = Y_pred.log_softmax(2)
+            loss = criterion(Y_pred, labels.cuda(), input_lengths, label_lengths)
+            loss.backward()
+            optimizer.step()
+            train_loss += loss.item()
+        train_loss /= len(dataloader)
+        train_losses.append(train_loss)
+        # torch.save(model.state_dict(),'final_asr.pth')
+        time_end=time.time()
+        elapsed_time=time_end-time_start
+        minutes = int(elapsed_time // 60)
+        seconds = elapsed_time % 60
+        print(f"第 {epoch+1} 轮花费了 {minutes} 分 {seconds:.2f} 秒")
+        print(f'Epoch {epoch+1}/{epochs}, Train Loss: {train_loss:.4f}')
+        if (epoch+1)%1==0:
+            devlabels=[]
+            devpre=[]
+            model.eval()
+            for batch in dev_dataloader:
+                fea, labels, input_lengths, label_lengths = batch
+                with torch.no_grad():
+                    Y_pred = model(fea.cuda() )
+                Y_pred=Y_pred.permute(1, 0, 2)
+                Y_pred=torch.argmax(Y_pred, dim=2).squeeze(0)
+                non_blank_sequence = [num for num in Y_pred]
+                final_sequence = []
+                for i, num in enumerate(non_blank_sequence):
+                    if i == 0 or (num != non_blank_sequence[i - 1] and num!=0):
+                        final_sequence.append(num)
+                new_final_sequence = []
+                for t in final_sequence:
+                    if t.dim() == 0:
+                        t = t.unsqueeze(0)
+                    new_final_sequence.append(t)
+
+                result_tensor = torch.cat(new_final_sequence, dim=0)
+                true_ids = labels[0].tolist()
+                if index in true_ids:
+                    true_ids = true_ids[:true_ids.index(index)]
+                true_ids = [x for x in true_ids if x != 0 and x != index]
+                devlabels.append(torch.tensor(true_ids).unsqueeze(0))
+
+                pred_ids = result_tensor.tolist()
+                if index in pred_ids:
+                    pred_ids = pred_ids[:pred_ids.index(index)]
+                pred_ids = [x for x in pred_ids if x != 0 and x != index]
+                devpre.append(torch.tensor(pred_ids).unsqueeze(0))
+
+            final_text = ''.join([id2char[num.item()] for num in final_sequence])
+            print(final_text)
+            true_label=''.join([id2char[num.item()] for num in labels[0]])
+            print(true_label)
+            error_rate = cer_multiple(devlabels, devpre)
+            print(f"字错误率 (CER): {error_rate * 100:.2f}%")
+
+    testlabels = []
+    testpre = []
+    model.eval()
+    sample_count = 0
+    for batch in test_dataloader:
         fea, labels, input_lengths, label_lengths = batch
-        optimizer.zero_grad()
-        Y_pred = model(fea.cuda())
-        Y_pred = Y_pred.log_softmax(2)
-        loss = criterion(Y_pred, labels.cuda(), input_lengths, label_lengths)
-        loss.backward()
-        optimizer.step()
-        train_loss += loss.item()
-    train_loss /= len(dataloader)
-    train_losses.append(train_loss)
-    # torch.save(model.state_dict(),'final_asr.pth')
-    time_end=time.time()
-    elapsed_time=time_end-time_start
-    minutes = int(elapsed_time // 60)
-    seconds = elapsed_time % 60
-    print(f"第 {epoch+1} 轮花费了 {minutes} 分 {seconds:.2f} 秒")
-    print(f'Epoch {epoch+1}/{epochs}, Train Loss: {train_loss:.4f}')
-    if (epoch+1)%1==0:
-      devlabels=[]
-      devpre=[]
-      model.eval()
-      for batch in dev_dataloader:
-          fea, labels, input_lengths, label_lengths = batch
-          with torch.no_grad():
-              Y_pred = model(fea.cuda() )
-          Y_pred=Y_pred.permute(1, 0, 2)
-          Y_pred=torch.argmax(Y_pred, dim=2).squeeze(0)
-          non_blank_sequence = [num for num in Y_pred]
-          final_sequence = []
-          for i, num in enumerate(non_blank_sequence):
-                      if i == 0 or (num != non_blank_sequence[i - 1] and num!=0):
-                          final_sequence.append(num)
-          new_final_sequence = []
-          for t in final_sequence:
-              if t.dim() == 0:
-                  t = t.unsqueeze(0)  # 将零维张量转换为一维张量
-              new_final_sequence.append(t)
-  
-          result_tensor = torch.cat(new_final_sequence, dim=0)
-          true_ids = labels[0].tolist()
-          if index in true_ids:
-              true_ids = true_ids[:true_ids.index(index)]
-          true_ids = [x for x in true_ids if x != 0 and x != index]
-          devlabels.append(torch.tensor(true_ids).unsqueeze(0))
-  
-          pred_ids = result_tensor.tolist()
-          if index in pred_ids:
-              pred_ids = pred_ids[:pred_ids.index(index)]
-          pred_ids = [x for x in pred_ids if x != 0 and x != index]
-          devpre.append(torch.tensor(pred_ids).unsqueeze(0))
-          # print(devlabels)
-      
-      # print(final_sequence)
-      final_text = ''.join([id2char[num.item()] for num in final_sequence])
-      print(final_text)
-      true_label=''.join([id2char[num.item()] for num in labels[0]])
-      print(true_label)
-      error_rate = cer_multiple(devlabels, devpre)
-      print(f"字错误率 (CER): {error_rate * 100:.2f}%")
-    
-testlabels = []
-testpre = []
-model.eval()
-for batch in test_dataloader:
-    fea, labels, input_lengths, label_lengths = batch
-    with torch.no_grad():
-        Y_pred = model(fea.cuda())
-    Y_pred = Y_pred.permute(1, 0, 2)
-    Y_pred = torch.argmax(Y_pred, dim=2).squeeze(0)
-    non_blank_sequence = [num for num in Y_pred]
-    final_sequence = []
-    for i, num in enumerate(non_blank_sequence):
-        if i == 0 or (num != non_blank_sequence[i - 1] and num != 0):
-            final_sequence.append(num)
-    new_final_sequence = []
-    for t in final_sequence:
-        if t.dim() == 0:
-            t = t.unsqueeze(0)
-        new_final_sequence.append(t)
+        with torch.no_grad():
+            Y_pred = model(fea.cuda())
+        Y_pred = Y_pred.permute(1, 0, 2)
+        Y_pred = torch.argmax(Y_pred, dim=2).squeeze(0)
+        non_blank_sequence = [num for num in Y_pred]
+        final_sequence = []
+        for i, num in enumerate(non_blank_sequence):
+            if i == 0 or (num != non_blank_sequence[i - 1] and num != 0):
+                final_sequence.append(num)
+        new_final_sequence = []
+        for t in final_sequence:
+            if t.dim() == 0:
+                t = t.unsqueeze(0)
+            new_final_sequence.append(t)
 
-    result_tensor = torch.cat(new_final_sequence, dim=0)
-    true_ids = labels[0].tolist()
-    if index in true_ids:
-        true_ids = true_ids[:true_ids.index(index)]
-    true_ids = [x for x in true_ids if x != 0 and x != index]
-    testlabels.append(torch.tensor(true_ids).unsqueeze(0))
+        result_tensor = torch.cat(new_final_sequence, dim=0)
+        true_ids = labels[0].tolist()
+        if index in true_ids:
+            true_ids = true_ids[:true_ids.index(index)]
+        true_ids = [x for x in true_ids if x != 0 and x != index]
+        testlabels.append(torch.tensor(true_ids).unsqueeze(0))
 
-    pred_ids = result_tensor.tolist()
-    if index in pred_ids:
-        pred_ids = pred_ids[:pred_ids.index(index)]
-    pred_ids = [x for x in pred_ids if x != 0 and x != index]
-    testpre.append(torch.tensor(pred_ids).unsqueeze(0))
+        pred_ids = result_tensor.tolist()
+        if index in pred_ids:
+            pred_ids = pred_ids[:pred_ids.index(index)]
+        pred_ids = [x for x in pred_ids if x != 0 and x != index]
+        testpre.append(torch.tensor(pred_ids).unsqueeze(0))
 
-test_error_rate = cer_multiple(testlabels, testpre)
-print(f"测试集字错误率 (CER): {test_error_rate * 100:.2f}%")
+        if sample_count < 5:
+            pred_text = ''.join([id2char[t] for t in pred_ids])
+            true_text = ''.join([id2char[t] for t in true_ids])
+            print(f"[样本{sample_count+1}] 预测: {pred_text}")
+            print(f"[样本{sample_count+1}] 真实: {true_text}")
+            sample_count += 1
+
+    test_error_rate = cer_multiple(testlabels, testpre)
+    print(f"测试集字错误率 (CER): {test_error_rate * 100:.2f}%")
