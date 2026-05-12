@@ -301,12 +301,16 @@ num_classes = len(char2id)
 mfcc_dim = 13
 model = ASRModel(mfcc_dim, num_blocks, filters, num_classes).cuda()
 st=torch.load('/home/lighte/model/g_0612_0.601')['model']
-# for name, param in model.named_parameters():
-#     if name in st:
-#         param.requires_grad = False
-#     else:
-#         param.requires_grad = True
-model.load_state_dict(st)
+
+# 扩展实验1: 冻结 CNN 前端，只训练 GRU + FC
+for name, param in model.named_parameters():
+    if 'gru' in name or 'fc' in name:
+        param.requires_grad = True   # GRU 和全连接层保持可训练
+    else:
+        param.requires_grad = False  # CNN 前端（conv1/bn1/blocks/conv2/bn2）冻结
+
+model.load_state_dict(st, strict=False)
+# model.load_state_dict(st)
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 criterion = nn.CTCLoss()
 
@@ -395,6 +399,7 @@ for epoch in range(epochs):
 testlabels = []
 testpre = []
 model.eval()
+sample_count = 0
 for batch in test_dataloader:
     fea, labels, input_lengths, label_lengths = batch
     with torch.no_grad():
@@ -424,6 +429,13 @@ for batch in test_dataloader:
         pred_ids = pred_ids[:pred_ids.index(index)]
     pred_ids = [x for x in pred_ids if x != 0 and x != index]
     testpre.append(torch.tensor(pred_ids).unsqueeze(0))
+
+    if sample_count < 5:
+        pred_text = ''.join([id2char[t] for t in pred_ids])
+        true_text = ''.join([id2char[t] for t in true_ids])
+        print(f"[样本{sample_count+1}] 预测: {pred_text}")
+        print(f"[样本{sample_count+1}] 真实: {true_text}")
+        sample_count += 1
 
 test_error_rate = cer_multiple(testlabels, testpre)
 print(f"测试集字错误率 (CER): {test_error_rate * 100:.2f}%")
