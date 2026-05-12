@@ -85,7 +85,7 @@ class ThchsData(Dataset):
         for path in text_paths:
             with open(path, 'r', encoding='utf8') as fr:
                 lines = fr.readlines()
-                line = lines[0].strip('\n').replace(' ', '').replace('../data','/public/model/data_thchs30/data')
+                line = lines[0].strip('\n').replace(' ', '').replace('../data','/home/lighte/model/data_thchs30/data')
                 with open(line, 'r', encoding='utf8') as fr2:
                     lines2 = fr2.readlines()
                     self.texts.append(lines2[0].strip('\n').replace(' ', ''))
@@ -99,8 +99,8 @@ class ThchsData(Dataset):
         chars = [char[0] for char in chars]
         
         # print(len(chars), chars[:100])
-        self.char2id =torch.load('/public/model/cha2id.pth')
-        self.id2char =torch.load('/public/model/id2char.pth')
+        self.char2id =torch.load('/home/lighte/model/cha2id.pth')
+        self.id2char =torch.load('/home/lighte/model/id2char.pth')
         new_char2id = {char: id + 1 for char, id in self.char2id.items()}
         self.char2id = new_char2id
 
@@ -284,8 +284,8 @@ class ASRModel(nn.Module):
 epochs = 10
 num_blocks = 3
 filters = 128
-char2id=torch.load('/public/model/cha2id.pth')
-id2char=torch.load('/public/model/id2char.pth')
+char2id=torch.load('/home/lighte/model/cha2id.pth')
+id2char=torch.load('/home/lighte/model/id2char.pth')
 new_char2id = {char: id + 1 for char, id in char2id.items()}
 char2id = new_char2id
 
@@ -300,7 +300,7 @@ char2id['<eos>']=index
 num_classes = len(char2id)
 mfcc_dim = 13
 model = ASRModel(mfcc_dim, num_blocks, filters, num_classes).cuda()
-st=torch.load('/public/model/g_0612_0.601')['model']
+st=torch.load('/home/lighte/model/g_0612_0.601')['model']
 # for name, param in model.named_parameters():
 #     if name in st:
 #         param.requires_grad = False
@@ -314,15 +314,15 @@ train_losses = []
 valid_losses = []
 batch_size = 32
 
-train_path='/public/model/data_thchs30/train/*.trn'
+train_path='/home/lighte/model/data_thchs30/train/*.trn'
 dataset = ThchsData(train_path, sample_rate=16000)
 dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
 
-dev_path='/public/model/data_thchs30/dev/*.trn'
+dev_path='/home/lighte/model/data_thchs30/dev/*.trn'
 dataset = ThchsData(dev_path, sample_rate=16000)
 dev_dataloader = DataLoader(dataset, batch_size=1, shuffle=False, collate_fn=collate_fn)
 
-test_path='/public/model/data_thchs30/test/*.trn'
+test_path='/home/lighte/model/data_thchs30/test/*.trn'
 dataset = ThchsData(test_path, sample_rate=16000)
 test_dataloader = DataLoader(dataset, batch_size=1, shuffle=False, collate_fn=collate_fn)
 
