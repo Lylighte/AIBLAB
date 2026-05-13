@@ -100,3 +100,8 @@ RNN/RNN/
 # !data/sample.csv
 
 check_backend.py
+check_dict.py
+debug_ckpt.py
+debug_audio.py
+*.m4a
+*.wav

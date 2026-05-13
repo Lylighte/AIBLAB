@@ -9,7 +9,7 @@
 |  | 命令词识别进阶要求（GRU, Test Acc 81.6% > 80%） |
 |  | 端到端语音识别（预训练-微调 10epochs, Dev CER 11.01%） |
 |  | 扩展实验1：预训练-微调冻结对比 |
-| **待办内容** | 扩展实验2：录制语音测试 |
+|  | 扩展实验2：录制语音测试 |
 | **运行环境** | 本地 Windows + NVIDIA RTX 4070 (12GB) + WSL |
 | **框架版本** | PyTorch 2.11 + CUDA 12.8 |
 | **编程语言** | Python 3.13 |
@@ -454,29 +454,44 @@ for name, param in model.named_parameters():
 
 ### 6.2 扩展实验 2：录制语音测试
 
-录制自己的语音进行 ASR 测试。实验中准备了一段简短的中文语音，使用训练好的 ASR 模型进行识别。
+录制自己的语音进行 ASR 测试。实验中用手机录制了一段中文语音（"徐州地方历代大规模征战五十余次"），使用训练好的 ASR 模型进行识别。
 
 **测试流程：**
 
 ```python
-# 加载自己的语音
-waveform, sample_rate = sf.read("my_voice.wav")
-# 提取 MFCC 特征
+# 1. 加载音频（librosa.load 自动归一化）
+waveform, sr = librosa.load("my_voice.wav", sr=16000)
+# 2. 提取 MFCC 特征 + CMVN 归一化
 fea = extract_mfcc(waveform)
-# 模型推理
+fea = normalize_mfcc(fea)       # 均值-方差归一化（解决数值溢出）
+# 3. 模型推理
 model.eval()
 with torch.no_grad():
-    Y_pred = model(fea.unsqueeze(0).cuda())
-# CTC 解码
-Y_pred = torch.argmax(Y_pred, dim=2).squeeze(0)
-# 去重 + 去空白符
+    Y_pred = model(fea.unsqueeze(0).transpose(1, 2).cuda())
+# 4. CTC 解码
+Y_pred = torch.argmax(Y_pred, dim=2).squeeze(1)
 result = decode_ctc(Y_pred)
 print("识别结果:", result)
 ```
 
 **测试结果：**
 
+```
+真实文本：徐州地方历代大规模征战五十余次
+识别文本：爱藏的尔鲜尔的吾尔吾尔学尔学以的城的
+字错误率（CER）：120.00%
+```
+
 **分析：**
+
+1. **模型输出数值溢出问题**：初始测试时模型输出全为 NaN（无效值），导致解码结果为空。调试发现手机录制语音的 MFCC 特征数值范围远大于训练数据（MFCC 范围达 $[-616, 254]$，而模型各层权重通常落在 $[-5, 5]$ 区间），在前向传播到第 4 个 ResBlock 时产生 NaN。通过添加 **CMVN 归一化**（对每个 MFCC 维度做均值-方差归一化，将特征缩放到均值 0、方差 1 的分布）解决了此问题。
+
+2. **识别质量极差**：输出文本与真实文本几乎毫无关联。
+   - **模型严重过拟合**：预训练模型在 THCHS-30 上训练 601 轮，原测试集 CER 已达 101%，对新录音的泛化能力本身就很差；
+   - **声学域不匹配**：手机录音的环境（普通房间、麦克风、背景噪声）或与 THCHS-30 子集存在显著差异，模型从未见过这种数据分布；
+   - **说话人不匹配**：THCHS-30 使用特定播音员录制，而自录语音的说话人音色、语速、口音均不在训练集中。
+
+3. **改进方向**：要获得较好的自录语音识别效果，需要在更多样化的数据上重新训练，或使用在大规模多说话人数据上预训练的模型进行微调。
 
 ---
 
