@@ -105,3 +105,5 @@ debug_ckpt.py
 debug_audio.py
 *.m4a
 *.wav
+
+tokenizer-bert-base-uncased/
