@@ -1,0 +1,79 @@
+(transformer) lighte@LIGHTE-5900:/mnt/c/Users/Lighte/GitHub/AIBLAB/Transformer$ python nlp_code.py 
+2
+[tensor([[  101,  3071,  2003,  ...,  2087,  3522,   102],
+        [  101, 15847,  2292,  ...,     0,     0,     0],
+        [  101,  1045,  2699,  ...,     0,     0,     0],
+        ...,
+        [  101,  2004,  2017,  ...,  2027,  2196,   102],
+        [  101,  2026,  2082,  ...,     0,     0,     0],
+        [  101,  2007, 12997,  ..., 17340,  5054,   102]]), tensor([[1, 1, 1,  ..., 1, 1, 1],
+        [1, 1, 1,  ..., 0, 0, 0],
+        [1, 1, 1,  ..., 0, 0, 0],
+        ...,
+        [1, 1, 1,  ..., 1, 1, 1],
+        [1, 1, 1,  ..., 0, 0, 0],
+        [1, 1, 1,  ..., 1, 1, 1]]), tensor([1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1,
+        1, 1, 1, 0, 0, 1, 1, 1])]
+/mnt/c/Users/Lighte/GitHub/AIBLAB/Transformer/nlp_code.py:87: UserWarning: enable_nested_tensor is True, but self.use_nested_tensor is False because encoder_layer.self_attn.batch_first was not True(use batch_first for better inference performance)
+  self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+test model before training
+tensor([[ 0.7280, -0.9196,  0.3959,  ..., -0.6584, -0.3264, -0.0479],
+        [ 0.8361, -0.9134,  0.5926,  ..., -0.7550, -0.6804,  0.6160],
+        [ 0.7778, -0.9027, -0.5843,  ..., -0.4938,  0.1556,  0.4661],
+        ...,
+        [ 0.8861, -0.9532,  0.0945,  ..., -0.6591, -0.5192, -0.2317],
+        [ 0.8585, -0.9310, -0.3221,  ..., -0.4589, -0.7845,  0.4541],
+        [ 0.8940, -0.8986, -0.2891,  ..., -0.7417, -0.0827,  0.7518]],
+       device='cuda:0', grad_fn=<TanhBackward0>)
+tensor([[-1.0869, -0.2747],
+        [-1.1082, -0.3688],
+        [-1.0100, -0.3025],
+        [-1.2585, -0.3837],
+        [-1.0020, -0.3473],
+        [-1.2080, -0.3423],
+        [-0.8587, -0.4748],
+        [-1.0243, -0.4135],
+        [-0.8631, -0.2193],
+        [-0.6054, -0.5704],
+        [-0.6029, -0.3410],
+        [-1.1422, -0.3212],
+        [-0.7227, -0.3876],
+        [-1.2051, -0.5389],
+        [-1.1480, -0.4268],
+        [-1.1916, -0.5720],
+        [-0.8953, -0.2067],
+        [-1.0615, -0.1590],
+        [-0.8271, -0.3996],
+        [-0.9700, -0.7309],
+        [-0.8337, -0.3864],
+        [-0.9726, -0.4215],
+        [-0.8461, -0.3057],
+        [-1.0748, -0.5919],
+        [-0.8101, -0.4066],
+        [-1.1103, -0.5027],
+        [-1.2458, -0.4458],
+        [-0.9030, -0.2797],
+        [-0.6729, -0.4165],
+        [-1.1268, -0.3199],
+        [-0.9602, -0.4064],
+        [-1.0371, -0.3843]], device='cuda:0', grad_fn=<AddmmBackward0>)
+Training vector_dim=100...
+Epoch 1 Loss: 0.6971
+Epoch 2 Loss: 0.6167
+Epoch 3 Loss: 0.4653
+Eval vector_dim=100...
+0.78532
+/mnt/c/Users/Lighte/GitHub/AIBLAB/Transformer/nlp_code.py:87: UserWarning: enable_nested_tensor is True, but self.use_nested_tensor is False because encoder_layer.self_attn.batch_first was not True(use batch_first for better inference performance)
+  self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+Training vector_dim=200...
+Epoch 1 Loss: 0.6615
+Epoch 2 Loss: 0.5042
+Epoch 3 Loss: 0.3781
+Eval vector_dim=200...
+0.82144
+
+Result Comparison:
+
+100-dim Model Accuracy: 0.7853
+200-dim Model Accuracy: 0.8214
+cost time:630.9646 seconds
