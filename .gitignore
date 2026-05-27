@@ -57,6 +57,7 @@ Thumbs.db
 
 # Logs
 *.log
+logs/
 
 # Temporary files
 *.tmp
@@ -95,6 +96,7 @@ SpeechCommands-sub/
 data_thchs30/
 RNN/RNN/
 .claude/
+outputs/
 
 # If needed, keep only tiny examples via explicit whitelist patterns, e.g.:
 # !data/sample.csv
