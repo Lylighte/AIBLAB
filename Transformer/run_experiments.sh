@@ -53,11 +53,11 @@ echo "==========================================" | tee -a "$RESULTS"
 # done
 
 echo ""
-echo "========== 4. 训练轮数对比 (bs=32) ==========" | tee -a "$RESULTS"
-for ep in 20 30; do
-    LOGFILE="$LOGS_DIR/ep${ep}_lr1e-4_bs32.log"
-    echo ">>> epochs=$ep lr=1e-4 batch=32 emb_dim=100 | log: $LOGFILE" | tee -a "$RESULTS"
-    python -u nlp_code.py --lr 1e-4 --batch_size 32 --epochs "$ep" --emb_dim 100 2>&1 | tee "$LOGFILE"
+echo "========== 5. 嵌入维度对比（修复后重跑） ==========" | tee -a "$RESULTS"
+for dim in 100 200; do
+    LOGFILE="$LOGS_DIR/emb${dim}_lr1e-4_bs64_ep10_v2.log"
+    echo ">>> emb_dim=$dim lr=1e-4 batch=64 epochs=10 | log: $LOGFILE" | tee -a "$RESULTS"
+    python -u nlp_code.py --lr 1e-4 --batch_size 64 --epochs 10 --emb_dim "$dim" 2>&1 | tee "$LOGFILE"
     echo ""
     tail -8 "$LOGFILE" | tee -a "$RESULTS"
     echo ""

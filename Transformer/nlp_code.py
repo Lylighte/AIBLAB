@@ -78,20 +78,24 @@ def prepare_data(batch_size=BATCH_SIZE):
 
 # Transformer模型定义
 class TransformerSentenceEncoder(nn.Module):
-    def __init__(self, vocab_size, output_dim=100, nhead=4, num_layers=6):
+    def __init__(self, vocab_size, embed_dim=100, output_dim=100, nhead=4, num_layers=6):
         super().__init__()
+        self.embed_dim = embed_dim
         self.output_dim = output_dim
-        self.embedding = nn.Embedding(vocab_size, output_dim)
-        self.pos_encoder = nn.Parameter(torch.randn(1, 512, output_dim))  # 简单位置编码
-        encoder_layer = nn.TransformerEncoderLayer(d_model=output_dim, nhead=nhead)
+        # 词嵌入层（对比实验的变量）
+        self.embedding = nn.Embedding(vocab_size, embed_dim)
+        self.pos_encoder = nn.Parameter(torch.randn(1, 512, embed_dim))  # 简单位置编码
+        # Transformer（d_model 与词嵌入维度一致）
+        encoder_layer = nn.TransformerEncoderLayer(d_model=embed_dim, nhead=nhead)
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-        self.projection = nn.Linear(output_dim, output_dim)
+        # 投影头（固定 output_dim，不做对比）
+        self.projection = nn.Linear(embed_dim, output_dim)
         self.layer_norm = nn.LayerNorm(output_dim)
         self.classifier = nn.Linear(output_dim, 2)  # 用于训练的辅助分类头
 
     def forward(self, input_ids, attention_mask):
         # 嵌入层
-        x = self.embedding(input_ids) * (self.output_dim ** 0.5)
+        x = self.embedding(input_ids) * (self.embed_dim ** 0.5)
         x = x + self.pos_encoder[:, :x.size(1), :]
 
         # Transformer编码
@@ -124,7 +128,7 @@ print(next(batch for batch in train_loader))
 
 def easy_test_model():
     # 在训练前初步验证模型实现代码
-    model = TransformerSentenceEncoder(output_dim=100, vocab_size=vocab_size).to(device)
+    model = TransformerSentenceEncoder(embed_dim=100, output_dim=100, vocab_size=vocab_size).to(device)
     print("test model before training")
     for batch in train_loader:
         input_ids, attention_mask, labels = batch
@@ -140,7 +144,7 @@ easy_test_model()
 
 # 模型训练
 def train_model(vector_dim=100):
-    model = TransformerSentenceEncoder(vocab_size=vocab_size, output_dim=vector_dim,
+    model = TransformerSentenceEncoder(vocab_size=vocab_size, embed_dim=vector_dim, output_dim=100,
                                         nhead=N_HEAD, num_layers=NUM_LAYERS).to(device)
 
     # 训练设置
