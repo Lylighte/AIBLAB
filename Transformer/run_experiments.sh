@@ -3,6 +3,7 @@
 # 用法: bash run_experiments.sh
 
 set -e
+export PYTHONUNBUFFERED=1
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
@@ -28,36 +29,35 @@ echo "==========================================" | tee -a "$RESULTS"
 #     tail -8 "$LOGFILE"
 # done
 
-echo ""
-echo "========== 1. 嵌入维度对比 ==========" | tee -a "$RESULTS"
-for dim in 100 200; do
-    LOGFILE="$LOGS_DIR/emb${dim}_lr1e-4_bs64_ep10.log"
-    echo ">>> emb_dim=$dim lr=1e-4 batch=64 epochs=10 | log: $LOGFILE" | tee -a "$RESULTS"
-    python nlp_code.py --lr 1e-4 --batch_size 64 --epochs 10 --emb_dim "$dim" 2>&1 | tee "$LOGFILE"
-    echo ""
-    tail -8 "$LOGFILE" | tee -a "$RESULTS"
-    echo ""
-done
+# ====== 第二轮实验（已完成） ======
+# 嵌入维度对比: emb=100(0.8178) emb=200(0.8270)
+# 批次大小对比: bs=32(0.8241) bs=64(0.8224)
+# 训练轮数对比(bs=64): ep=5(0.8015) ep=10(0.8224) ep=20(0.8154) ep=30(0.8232)
+# for dim in 100 200; do
+#     LOGFILE="$LOGS_DIR/emb${dim}_lr1e-4_bs64_ep10.log"
+#     echo ">>> emb_dim=$dim lr=1e-4 batch=64 epochs=10 | log: $LOGFILE"
+#     python -u nlp_code.py --lr 1e-4 --batch_size 64 --epochs 10 --emb_dim "$dim" 2>&1 | tee "$LOGFILE"
+#     tail -8 "$LOGFILE"
+# done
+# for bs in 32; do
+#     LOGFILE="$LOGS_DIR/bs${bs}_lr1e-4_ep10.log"
+#     echo ">>> batch=$bs lr=1e-4 epochs=10 emb_dim=100 | log: $LOGFILE"
+#     python -u nlp_code.py --lr 1e-4 --batch_size "$bs" --epochs 10 --emb_dim 100 2>&1 | tee "$LOGFILE"
+#     tail -8 "$LOGFILE"
+# done
+# for ep in 5 20 30; do
+#     LOGFILE="$LOGS_DIR/ep${ep}_lr1e-4_bs64.log"
+#     echo ">>> epochs=$ep lr=1e-4 batch=64 emb_dim=100 | log: $LOGFILE"
+#     python -u nlp_code.py --lr 1e-4 --batch_size 64 --epochs "$ep" --emb_dim 100 2>&1 | tee "$LOGFILE"
+#     tail -8 "$LOGFILE"
+# done
 
 echo ""
-echo "========== 2. 批次大小对比 ==========" | tee -a "$RESULTS"
-# bs=64(0.8224)
-for bs in 32; do
-    LOGFILE="$LOGS_DIR/bs${bs}_lr1e-4_ep10.log"
-    echo ">>> batch=$bs lr=1e-4 epochs=10 emb_dim=100 | log: $LOGFILE" | tee -a "$RESULTS"
-    python nlp_code.py --lr 1e-4 --batch_size "$bs" --epochs 10 --emb_dim 100 2>&1 | tee "$LOGFILE"
-    echo ""
-    tail -8 "$LOGFILE" | tee -a "$RESULTS"
-    echo ""
-done
-
-echo ""
-echo "========== 3. 训练轮数对比 ==========" | tee -a "$RESULTS"
-# ep=10(0.8224)
-for ep in 5 20 30; do
-    LOGFILE="$LOGS_DIR/ep${ep}_lr1e-4_bs64.log"
-    echo ">>> epochs=$ep lr=1e-4 batch=64 emb_dim=100 | log: $LOGFILE" | tee -a "$RESULTS"
-    python nlp_code.py --lr 1e-4 --batch_size 64 --epochs "$ep" --emb_dim 100 2>&1 | tee "$LOGFILE"
+echo "========== 4. 训练轮数对比 (bs=32) ==========" | tee -a "$RESULTS"
+for ep in 20 30; do
+    LOGFILE="$LOGS_DIR/ep${ep}_lr1e-4_bs32.log"
+    echo ">>> epochs=$ep lr=1e-4 batch=32 emb_dim=100 | log: $LOGFILE" | tee -a "$RESULTS"
+    python -u nlp_code.py --lr 1e-4 --batch_size 32 --epochs "$ep" --emb_dim 100 2>&1 | tee "$LOGFILE"
     echo ""
     tail -8 "$LOGFILE" | tee -a "$RESULTS"
     echo ""
