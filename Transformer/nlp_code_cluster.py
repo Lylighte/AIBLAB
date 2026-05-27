@@ -15,26 +15,26 @@ from pathlib import Path
 # 按需自行添加
 # ...
 
-# 超参数（可通过命令行覆盖）
+# 超参数
 BATCH_SIZE = 32
 EPOCHS = 3
 LEARNING_RATE = 2e-4
 N_HEAD = 4
+# embed_dim must be divisible by num_heads
 NUM_LAYERS = 6
-EMB_DIM = 100  # 词嵌入维度
 
 # 训练配置
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 ROOT = Path(__file__).resolve().parent
-# DATA_DIR = ROOT / "IMDB_datasets" / "hf_imdb"
-# TOKENIZER_DIR = ROOT / "tokenizer-bert-base-uncased"
-DATA_DIR = Path.home() / "model/IMDB_datasets/hf_imdb"
-TOKENIZER_DIR = Path.home() / "model/tokenizer-bert-base-uncased"
+DATA_DIR = ROOT / "IMDB_datasets" / "hf_imdb"
+TOKENIZER_DIR = ROOT / "tokenizer-bert-base-uncased"
+# DATA_DIR = Path.home() / "model/IMDB_datasets/hf_imdb"
+# TOKENIZER_DIR = Path.home() / "model/tokenizer-bert-base-uncased"
 OUTPUT_DIR = ROOT / "outputs"
 
 
 # 数据加载与预处理
-def prepare_data(batch_size=BATCH_SIZE):
+def prepare_data():
     # 加载数据集
     train_data = pd.read_parquet(DATA_DIR / "train-00000-of-00001.parquet")
     test_data = pd.read_parquet(DATA_DIR / "test-00000-of-00001.parquet")
@@ -64,8 +64,8 @@ def prepare_data(batch_size=BATCH_SIZE):
     test_dataset = TensorDataset(test_encodings['input_ids'],
                                  test_encodings['attention_mask'], test_labels)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
     # 分类数（num_classes）：标签的唯一值数量
     num_classes = len(train_data["label"].unique())
@@ -78,7 +78,7 @@ def prepare_data(batch_size=BATCH_SIZE):
 
 # Transformer模型定义
 class TransformerSentenceEncoder(nn.Module):
-    def __init__(self, vocab_size, output_dim=100, nhead=4, num_layers=6):
+    def __init__(self, vocab_size, output_dim=100):
         super().__init__()
         self.output_dim = output_dim
         self.embedding = nn.Embedding(vocab_size, output_dim)
@@ -114,8 +114,8 @@ class TransformerSentenceEncoder(nn.Module):
 nhead = N_HEAD
 num_layers = NUM_LAYERS
 
-# 数据准备（在 __main__ 中根据命令行参数重新加载）
-train_loader, test_loader, num_classes, vocab_size = prepare_data(BATCH_SIZE)
+# 数据准备
+train_loader, test_loader, num_classes, vocab_size = prepare_data()
 print(num_classes)
 
 # 验证数据加载器是否正确
@@ -140,8 +140,7 @@ easy_test_model()
 
 # 模型训练
 def train_model(vector_dim=100):
-    model = TransformerSentenceEncoder(vocab_size=vocab_size, output_dim=vector_dim,
-                                        nhead=N_HEAD, num_layers=NUM_LAYERS).to(device)
+    model = TransformerSentenceEncoder(vocab_size=vocab_size, output_dim=vector_dim).to(device)
 
     # 训练设置
     criterion = nn.CrossEntropyLoss()
@@ -214,58 +213,21 @@ def eval_model(vector_dim=100):
 
 # 执行实验
 if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--lr", type=float, default=LEARNING_RATE)
-    parser.add_argument("--batch_size", type=int, default=BATCH_SIZE)
-    parser.add_argument("--epochs", type=int, default=EPOCHS)
-    parser.add_argument("--emb_dim", type=int, default=EMB_DIM, choices=[100, 200])
-    parser.add_argument("--compare_dim", action="store_true",
-                        help="同时跑 100 和 200 维对比")
-    args = parser.parse_args()
-
-    # 用命令行参数覆盖全局超参数
-    LEARNING_RATE = args.lr
-    EPOCHS = args.epochs
-    EMB_DIM = args.emb_dim
-
-    # 如果 batch_size 变化，重新创建 DataLoader
-    if args.batch_size != BATCH_SIZE:
-        BATCH_SIZE = args.batch_size
-        train_loader, test_loader, _, _ = prepare_data(batch_size=BATCH_SIZE)
-    else:
-        BATCH_SIZE = args.batch_size
-
     start_time = time.time()
-
-    if args.compare_dim:
-        acc_100 = eval_model(100)
-        acc_200 = eval_model(200)
-    else:
-        acc = eval_model(EMB_DIM)
-
+    acc_100 = eval_model(100)
+    print(acc_100)
+    acc_200 = eval_model(200)
+    print(acc_200)
     end_time = time.time()
-    elapsed = end_time - start_time
-
-    if args.compare_dim:
-        summary = (
-            f"\n{'='*60}\n"
-            f"  RESULT | lr={LEARNING_RATE}  batch={BATCH_SIZE}  epochs={EPOCHS}\n"
-            f"  ACCURACY:  100-dim = {acc_100:.4f}  |  200-dim = {acc_200:.4f}\n"
-            f"  TIME: {elapsed:.2f}s\n"
-            f"{'='*60}\n"
-        )
-    else:
-        summary = (
-            f"\n{'='*60}\n"
-            f"  RESULT | lr={LEARNING_RATE}  batch={BATCH_SIZE}  epochs={EPOCHS}  emb_dim={EMB_DIM}\n"
-            f"  ACCURACY: {acc:.4f}  |  TIME: {elapsed:.2f}s\n"
-            f"{'='*60}\n"
-        )
-
-    print(summary)
-
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     score_path = OUTPUT_DIR / "score.txt"
     with open(score_path, "a+", encoding='utf-8') as f:
-        f.write(summary)
+        f.write("\nResult Comparison:\n")
+        f.write(f"100-dim Model Accuracy: {acc_100:.4f}\n")
+        f.write(f"200-dim Model Accuracy: {acc_200:.4f}\n")
+        f.write(f"cost time:{end_time - start_time :.4f} seconds\n")
+
+    print("\nResult Comparison:\n")
+    print(f"100-dim Model Accuracy: {acc_100:.4f}")
+    print(f"200-dim Model Accuracy: {acc_200:.4f}")
+    print(f"cost time:{end_time - start_time :.4f} seconds")
