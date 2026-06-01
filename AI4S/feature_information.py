@@ -79,10 +79,25 @@ class FeatureInformation:
         '''
         return self.__loss
 
+    def get_coef(self):
+        '''
+        获取特征的系数列表 [c1, b]
+        '''
+        return self.__coef.copy() if self.__coef else []
+
+    def get_data_array(self):
+        '''
+        获取特征的数据 (numpy array)
+        '''
+        data_str = self.__data.columns[0]
+        return self.__data[data_str].values
+
     def get_full_name(self):
         '''
         获取特征的完整名称
         '''
+        if not self.__coef:
+            return self.__data.columns[0]
         return str(self.__coef[0]) + self.__data.columns[0] + '+' + str(self.__coef[1])
 
     def get_full_data(self):

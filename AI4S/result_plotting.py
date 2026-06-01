@@ -31,10 +31,10 @@ def plot_result(feature:FeatureInformation, target:pd.DataFrame, path):
     colorblue = np.array([36, 103, 180]) / 255.0
     redcolor = np.array([255, 59, 59]) / 255.0
 
-    x = feature.get_full_data().to_numpy()
+    x = feature.get_full_data().to_numpy().flatten()
 #     x_name = feature.get_full_name()
 
-    y = target.to_numpy()
+    y = target.to_numpy().flatten()
 #     y_name = target.columns[0]
 
     # 创建图形2
@@ -43,15 +43,15 @@ def plot_result(feature:FeatureInformation, target:pd.DataFrame, path):
 
     # 绘制数据点
     ax.plot(x, y,  'o', color=threecolors[0,:],
-            markersize=6,  
-            markerfacecolor=threecolors[0,:], 
+            markersize=6,
+            markerfacecolor=threecolors[0,:],
             markeredgecolor=threecolors[0,:], label='Data')
 
-    x_max = max(x)+1
-    y_max = max(y)+1
+    x_max = x.max() + 1
+    y_max = y.max() + 1
 
     # # 绘制拟合线
-    ax.plot([-1, max(x_max, y_max)[0]], [-1, max(x_max, y_max)[0]], '-', 
+    ax.plot([-1, max(x_max, y_max)], [-1, max(x_max, y_max)], '-',
             color=redcolor, linewidth=4, label='Fit')
 
     # 设置刻度和标签
