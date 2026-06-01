@@ -78,7 +78,7 @@ def _expand_replace(top_nodes, top_data_list, top_names,
     优点: 简单直接
     缺点: 丢失原始物理特征，可解释性下降
     """
-    from expansion import expand as full_expand
+    from expansion import expand_full as full_expand
 
     # 构建新的 dataframe
     if top_data_list:
@@ -87,9 +87,8 @@ def _expand_replace(top_nodes, top_data_list, top_names,
         combined_data = orig_data.to_numpy()
 
     new_df = pd.DataFrame(combined_data, columns=top_names)
-    # 做一次完整 expand (不显示 verbose 避免重复输出)
-    expanded = full_expand(new_df, enable_binary_div=enable_div,
-                           enable_ternary_mul=False, verbose=False)
+    # 做一次完整 expand
+    expanded = full_expand(new_df, enable_binary_div=enable_div)
 
     # 过滤已见过的特征
     new_cols = [c for c in expanded.columns
@@ -169,11 +168,10 @@ def _expand_layered(top_nodes, top_data_list, top_names,
     分层策略 (推荐): 原始特征基础 expand + 高分特征与原始特征交叉
     兼顾物理可解释性和搜索效率
     """
-    from expansion import expand as full_expand
+    from expansion import expand_full as full_expand
 
     # Layer 1: 原始特征的基础扩展 (保守策略)
-    expanded_base = full_expand(orig_data, enable_binary_div=enable_div,
-                                enable_ternary_mul=False, verbose=False)
+    expanded_base = full_expand(orig_data, enable_binary_div=enable_div)
     base_cols = [c for c in expanded_base.columns
                  if _simplify(c) not in seen_names]
     if base_cols:

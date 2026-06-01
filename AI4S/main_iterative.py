@@ -10,7 +10,7 @@ main_iterative.py — 实验 7.6.4: 迭代式针对性搜索
 配置: 修改下方 CONFIG 字典
 """
 
-from expansion import expand
+from expansion import expand, expand_full
 from iterative_expansion import expand_guided
 from result_sorting import sort_result
 from result_displaying import display_result
@@ -20,8 +20,6 @@ from result_plotting import plot_result
 from result_storage import FeatureNode, FeatureTree
 from termination import stop_or_not
 import pandas as pd
-import torch
-import numpy as np
 import os
 
 # ==================== 实验配置 ====================
@@ -49,7 +47,6 @@ CONFIG = {
 }
 # =================================================
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 path = CONFIG['path']
 
 print("=" * 60)
@@ -86,8 +83,7 @@ while not should_stop:
     # ── Step 1: 特征扩展 ──
     if iteration == 1:
         # 第一轮: 基础扩展 (启用除法)
-        data_expanded = expand(data, enable_binary_div=CONFIG['enable_div'],
-                               verbose=False)
+        data_expanded = expand_full(data, enable_binary_div=CONFIG['enable_div'])
         # 更新 seen_names
         for c in data_expanded.columns:
             seen_names.add(c.replace(' ', '').replace('**', '^'))
@@ -144,7 +140,7 @@ while not should_stop:
         break
 
     # ── Step 3: 系数拟合 ──
-    r2, coef, loss, times = fit(data_sis, focus.to_numpy(), device,
+    r2, coef, loss, times = fit(data_sis, focus.to_numpy(),
                                  method=CONFIG['fit_method'])
 
     # ── Step 4: 结果整理 ──
