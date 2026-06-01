@@ -109,3 +109,5 @@ debug_audio.py
 *.wav
 
 tokenizer-bert-base-uncased/
+
+*.pdf
