@@ -78,20 +78,27 @@ def prepare_data():
 
 # Transformer模型定义
 class TransformerSentenceEncoder(nn.Module):
-    def __init__(self, vocab_size, output_dim=100):
+    def __init__(self, vocab_size, embed_dim, output_dim=100):
+        """
+        Args:
+            vocab_size: 词汇表大小
+            embed_dim: 词嵌入向量维度 / Transformer隐藏层维度（d_model）
+                       这就是实验对比的变量：100维 vs 200维
+            output_dim: 最后一个线性投影层的输出维度（句子向量空间）
+        """
         super().__init__()
-        self.output_dim = output_dim
-        self.embedding = nn.Embedding(vocab_size, output_dim)
-        self.pos_encoder = nn.Parameter(torch.randn(1, 512, output_dim))  # 简单位置编码
-        encoder_layer = nn.TransformerEncoderLayer(d_model=output_dim, nhead=nhead)
+        self.embed_dim = embed_dim
+        self.embedding = nn.Embedding(vocab_size, embed_dim)
+        self.pos_encoder = nn.Parameter(torch.randn(1, 512, embed_dim))  # 简单位置编码
+        encoder_layer = nn.TransformerEncoderLayer(d_model=embed_dim, nhead=nhead)
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-        self.projection = nn.Linear(output_dim, output_dim)
+        self.projection = nn.Linear(embed_dim, output_dim)
         self.layer_norm = nn.LayerNorm(output_dim)
         self.classifier = nn.Linear(output_dim, 2)  # 用于训练的辅助分类头
 
     def forward(self, input_ids, attention_mask):
         # 嵌入层
-        x = self.embedding(input_ids) * (self.output_dim ** 0.5)
+        x = self.embedding(input_ids) * (self.embed_dim ** 0.5)
         x = x + self.pos_encoder[:, :x.size(1), :]
 
         # Transformer编码
@@ -124,7 +131,7 @@ print(next(batch for batch in train_loader))
 
 def easy_test_model():
     # 在训练前初步验证模型实现代码
-    model = TransformerSentenceEncoder(output_dim=100, vocab_size=vocab_size).to(device)
+    model = TransformerSentenceEncoder(embed_dim=100, output_dim=100, vocab_size=vocab_size).to(device)
     print("test model before training")
     for batch in train_loader:
         input_ids, attention_mask, labels = batch
@@ -139,8 +146,8 @@ easy_test_model()
 
 
 # 模型训练
-def train_model(vector_dim=100):
-    model = TransformerSentenceEncoder(vocab_size=vocab_size, output_dim=vector_dim).to(device)
+def train_model(embed_dim=100):
+    model = TransformerSentenceEncoder(vocab_size=vocab_size, embed_dim=embed_dim, output_dim=100).to(device)
 
     # 训练设置
     criterion = nn.CrossEntropyLoss()
@@ -149,7 +156,7 @@ def train_model(vector_dim=100):
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=total_steps)
 
     # 预训练阶段
-    print(f"Training vector_dim={vector_dim}...")
+    print(f"Training embed_dim={embed_dim}...")
 
     for epoch in range(EPOCHS):
         model.train()
@@ -173,13 +180,13 @@ def train_model(vector_dim=100):
 
 
 # 模型评估
-def eval_model(vector_dim=100):
+def eval_model(embed_dim=100):
     train_features = []
     test_features = []
     train_labels_list = []
     test_labels_list = []
-    model = train_model(vector_dim)
-    print(f"Eval vector_dim={vector_dim}...")
+    model = train_model(embed_dim)
+    print(f"Eval embed_dim={embed_dim}...")
     model.eval()
     with torch.no_grad():
         for batch in train_loader:
@@ -214,20 +221,23 @@ def eval_model(vector_dim=100):
 # 执行实验
 if __name__ == "__main__":
     start_time = time.time()
-    acc_100 = eval_model(100)
-    print(acc_100)
-    acc_200 = eval_model(200)
-    print(acc_200)
+    print("=" * 60)
+    print("实验：对比 100维 vs 200维 词嵌入向量")
+    print("=" * 60)
+    acc_100 = eval_model(embed_dim=100)
+    print(f"100-dim Embedding Accuracy: {acc_100:.4f}")
+    acc_200 = eval_model(embed_dim=200)
+    print(f"200-dim Embedding Accuracy: {acc_200:.4f}")
     end_time = time.time()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     score_path = OUTPUT_DIR / "score.txt"
     with open(score_path, "a+", encoding='utf-8') as f:
         f.write("\nResult Comparison:\n")
-        f.write(f"100-dim Model Accuracy: {acc_100:.4f}\n")
-        f.write(f"200-dim Model Accuracy: {acc_200:.4f}\n")
+        f.write(f"100-dim Embedding Model Accuracy: {acc_100:.4f}\n")
+        f.write(f"200-dim Embedding Model Accuracy: {acc_200:.4f}\n")
         f.write(f"cost time:{end_time - start_time :.4f} seconds\n")
 
     print("\nResult Comparison:\n")
-    print(f"100-dim Model Accuracy: {acc_100:.4f}")
-    print(f"200-dim Model Accuracy: {acc_200:.4f}")
+    print(f"100-dim Embedding Model Accuracy: {acc_100:.4f}")
+    print(f"200-dim Embedding Model Accuracy: {acc_200:.4f}")
     print(f"cost time:{end_time - start_time :.4f} seconds")

@@ -12,24 +12,41 @@ from sklearn.metrics import accuracy_score
 import pandas as pd
 import time
 import math
+import argparse
 from pathlib import Path
 # 按需自行添加
 
 
-# 超参数
-BATCH_SIZE = 32
-EPOCHS = 3
-LEARNING_RATE = 2e-4
-N_HEAD = 4
-# embed_dim must be divisible by num_heads
-NUM_LAYERS = 6
+# ========== 命令行参数解析 ==========
+def parse_args():
+    parser = argparse.ArgumentParser(description="Transformer 情感分析实验")
+    parser.add_argument("--lr", type=float, default=2e-4, help="学习率")
+    parser.add_argument("--batch_size", type=int, default=32, help="批次大小")
+    parser.add_argument("--epochs", type=int, default=3, help="训练轮数")
+    parser.add_argument("--embed_dim", type=int, default=None,
+                        help="词嵌入维度（若不指定，则依次跑 100 和 200 做对比）")
+    parser.add_argument("--n_head", type=int, default=4, help="注意力头数")
+    parser.add_argument("--num_layers", type=int, default=6, help="Transformer 层数")
+    return parser.parse_args()
+
+
+args = parse_args()
+
+# 超参数（优先使用命令行参数）
+BATCH_SIZE = args.batch_size
+EPOCHS = args.epochs
+LEARNING_RATE = args.lr
+N_HEAD = args.n_head
+NUM_LAYERS = args.num_layers
+
+# ========== 工具函数 ==========
+def get_device():
+    return torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # 训练配置
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-ROOT = Path(__file__).resolve().parent
-DATA_DIR = ROOT / "IMDB_datasets" / "hf_imdb"
-TOKENIZER_DIR = ROOT / "tokenizer-bert-base-uncased"
-OUTPUT_DIR = ROOT / "outputs"
+DATA_DIR = Path("/home/lighte/model/IMDB_datasets/hf_imdb")
+TOKENIZER_DIR = Path("/home/lighte/model/tokenizer-bert-base-uncased")
+OUTPUT_DIR = Path("/home/lighte/model/Transformer/outputs")
 
 
 # 数据加载与预处理
@@ -156,6 +173,7 @@ for batch in train_loader:
 
 def easy_test_model():
     # 在训练前初步验证模型实现代码
+    device = get_device()
     model = TransformerSentenceEncoder(embed_dim=100, output_dim=100, vocab_size=vocab_size).to(device)
     print("test model before training")
     for batch in train_loader:
@@ -174,6 +192,7 @@ easy_test_model()
 
 # 模型训练
 def train_model(embed_dim=100):
+    device = get_device()
     model = TransformerSentenceEncoder(vocab_size=vocab_size, embed_dim=embed_dim, output_dim=100).to(device)
 
     # 训练设置
@@ -208,6 +227,7 @@ def train_model(embed_dim=100):
 
 # 模型评估
 def eval_model(embed_dim=100):
+    device = get_device()
     train_features = []
     test_features = []
     train_labels_list = []
@@ -249,27 +269,39 @@ def eval_model(embed_dim=100):
 if __name__ == "__main__":
     start_time = time.time()
 
-    # 对比实验：变化的是 embed_dim（词嵌入向量维度），而不是 output_dim
-    print("=" * 60)
-    print("实验：对比 100维 vs 200维 词嵌入向量")
-    print("=" * 60)
+    if args.embed_dim is not None:
+        # 跑单个配置
+        print(f"\n{'=' * 60}")
+        print(f"实验配置: lr={LEARNING_RATE}  batch={BATCH_SIZE}  epochs={EPOCHS}  embed_dim={args.embed_dim}")
+        print(f"{'=' * 60}")
+        acc = eval_model(embed_dim=args.embed_dim)
+        print(f"\nAccuracy: {acc:.4f}")
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        score_path = OUTPUT_DIR / "score.txt"
+        with open(score_path, "a+", encoding='utf-8') as f:
+            f.write(f"\nlr={LEARNING_RATE}  batch={BATCH_SIZE}  epochs={EPOCHS}  embed_dim={args.embed_dim}")
+            f.write(f"  Accuracy: {acc:.4f}")
+    else:
+        # 对比实验：变化的是 embed_dim（词嵌入向量维度），而不是 output_dim
+        print("=" * 60)
+        print("实验：对比 100维 vs 200维 词嵌入向量")
+        print("=" * 60)
 
-    acc_100 = eval_model(embed_dim=100)
-    print(f"\n100-dim Embedding Accuracy: {acc_100:.4f}")
+        acc_100 = eval_model(embed_dim=100)
+        print(f"\n100-dim Embedding Accuracy: {acc_100:.4f}")
 
-    acc_200 = eval_model(embed_dim=200)
-    print(f"200-dim Embedding Accuracy: {acc_200:.4f}")
+        acc_200 = eval_model(embed_dim=200)
+        print(f"200-dim Embedding Accuracy: {acc_200:.4f}")
+
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        score_path = OUTPUT_DIR / "score.txt"
+        with open(score_path, "a+", encoding='utf-8') as f:
+            f.write("\nResult Comparison:\n")
+            f.write(f"100-dim Embedding Model Accuracy: {acc_100:.4f}\n")
+            f.write(f"200-dim Embedding Model Accuracy: {acc_200:.4f}\n")
 
     end_time = time.time()
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    score_path = OUTPUT_DIR / "score.txt"
     with open(score_path, "a+", encoding='utf-8') as f:
-        f.write("\nResult Comparison:\n")
-        f.write(f"100-dim Embedding Model Accuracy: {acc_100:.4f}\n")
-        f.write(f"200-dim Embedding Model Accuracy: {acc_200:.4f}\n")
-        f.write(f"cost time:{end_time - start_time :.4f} seconds\n")
+        f.write(f"  cost time:{end_time - start_time :.4f} seconds\n")
 
-    print("\nResult Comparison:\n")
-    print(f"100-dim Embedding Model Accuracy: {acc_100:.4f}")
-    print(f"200-dim Embedding Model Accuracy: {acc_200:.4f}")
     print(f"cost time:{end_time - start_time :.4f} seconds")
