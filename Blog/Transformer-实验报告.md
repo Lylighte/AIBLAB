@@ -1,0 +1,216 @@
+# 基于 Transformer 的 IMDB 情感分析实验报告
+
+**组号：** 第X组 &nbsp;&nbsp;&nbsp;&nbsp; **姓名：** XXX &nbsp;&nbsp;&nbsp;&nbsp; **学号：** PB24XXXXXX
+
+---
+
+## 1 实验基本信息
+
+### 1.1 实验目的
+
+1. 掌握深度学习的基本步骤，包括定义网络的流程、损失函数的作用、优化算法的作用。
+2. 理解模型评估与改进，包括模型超参数调节、模型微调的基本过程。
+3. 掌握基于 Transformer 的情感分析设计流程，包括基于 Transformer 的句子向量生成方法、文本数据预处理方法、词嵌入维度对结果的影响。
+
+### 1.2 实验环境
+
+| 项目 | 配置 |
+|------|------|
+| 操作系统 | WSL2 (Ubuntu 24.04) |
+| GPU | NVIDIA GeForce RTX 4070 (12GB) |
+| Python | 3.13 |
+| 深度学习框架 | PyTorch |
+| NLP 工具库 | HuggingFace Transformers |
+| 机器学习库 | scikit-learn |
+| 数据集 | IMDB Large Movie Review Dataset |
+| 训练集规模 | 25,000 条（正负各 12,500） |
+| 测试集规模 | 25,000 条（正负各 12,500） |
+| 分词器 | BERT-base-uncased (WordPiece, 词汇表 30,522) |
+
+### 1.3 实验流程
+
+```text
+raw text
+→ BERT tokenizer
+→ input_ids + attention_mask
+→ token embedding + position encoding
+→ TransformerEncoder
+→ 第一个 token 位置的句向量
+→ 辅助分类头训练 encoder
+→ 抽取 train/test 句向量
+→ StandardScaler + LogisticRegression
+→ accuracy
+```
+
+---
+
+## 2 关键代码说明
+
+### 2.1 模型结构
+
+实验中自行实现了 Transformer 句向量编码器，未直接调用预训练 BERT 模型，仅使用其分词器进行文本预处理。
+
+```python
+class TransformerSentenceEncoder(nn.Module):
+    def __init__(self, vocab_size, embed_dim, output_dim=100):
+        super().__init__()
+        self.embedding = nn.Embedding(vocab_size, embed_dim)
+        self.pos_encoder = PositionalEncoding(embed_dim)
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=embed_dim, nhead=N_HEAD, batch_first=True
+        )
+        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=NUM_LAYERS)
+        self.projection = nn.Linear(embed_dim, output_dim)
+        self.layer_norm = nn.LayerNorm(output_dim)
+        self.classifier = nn.Linear(output_dim, 2)
+```
+
+> **说明：** 参数 `embed_dim` 控制词嵌入向量维度和 Transformer 隐藏层维度（d_model），即实验对比的核心变量（100 vs 200）。参数 `output_dim` 仅控制投影层输出维度，固定为 100 不参与对比。
+
+### 2.2 前向传播
+
+```python
+def forward(self, input_ids, attention_mask):
+    x = self.embedding(input_ids)                    # (batch, seq_len, embed_dim)
+    x = self.pos_encoder(x)
+    attn_mask = (attention_mask == 0)
+    x = self.transformer(x, src_key_padding_mask=attn_mask)
+    sentence_vector = x[:, 0, :]                     # 取 [CLS] token
+    projected = self.projection(sentence_vector)
+    sentence_vector = torch.tanh(self.layer_norm(projected))
+    logits = self.classifier(sentence_vector)
+    return sentence_vector, logits
+```
+
+### 2.3 评估策略
+
+训练完成后，将 Transformer 编码器作为特征提取器使用，抽取训练集和测试集的句向量。随后使用 `StandardScaler` 标准化特征，用 `LogisticRegression(max_iter=1000)` 在训练集句向量上训练线性分类器，输出测试集准确率。采用统一的逻辑回归分类器排除了分类器差异对对比实验的干扰。
+
+---
+
+## 3 实验结果与分析
+
+### 3.1 学习率调优
+
+固定 `batch_size=32, epochs=10, embed_dim=100`
+
+| 学习率 | Loss（最后 epoch） | 准确率 | 备注 |
+|--------|-------------------|--------|------|
+| 5e-5   | 0.3469            | 0.8332 | Loss 稳步下降 |
+| **1e-4** | **0.3223**       | **0.8397** | **最佳** |
+| 2e-4   | 0.6932            | 0.7057 | 未收敛 ❌ |
+
+**分析：** 学习率 5e-5 和 1e-4 均能正常收敛，其中 1e-4 在 Loss 和准确率上均表现最优。学习率 2e-4 时 Loss 卡在 0.693 附近（约 ln2），表明模型无法有效学习，梯度在较大学习率下震荡导致不收敛。
+
+### 3.2 批次大小对比
+
+固定 `lr=1e-4, epochs=10, embed_dim=100`
+
+| 批次大小 | Loss（最后 epoch） | 准确率 | 耗时（秒） |
+|----------|-------------------|--------|-----------|
+| 32       | 0.3223            | **0.8397** | 1,829 |
+| 64       | 0.3345            | 0.8393 | 1,813 |
+
+**分析：** 批次大小 32 和 64 在准确率上差异不大（0.8413 vs 0.8393），bs=32 略优且训练速度更快。从 Loss 看，bs=64 的收敛速度略慢于 bs=32，这符合小批次带来梯度噪声有助于泛化的经验规律。
+
+### 3.3 训练轮数对比
+
+固定 `lr=1e-4, batch_size=32, embed_dim=100`
+
+| 训练轮数 | Loss（最后 epoch） | 准确率 | 耗时（秒） |
+|----------|-------------------|--------|-----------|
+| 5        | 0.4156            | 0.8054 | 957 |
+| 10       | 0.3219            | **0.8413** | 1,769 |
+
+**分析：** 训练轮数从 5 增加到 10，准确率从 0.8054 提升至 0.8413（+3.59%），提升显著。Loss 从 0.4156 降至 0.3219，说明模型仍处于学习阶段，更多的训练轮数有助于充分收敛。
+
+### 3.4 词嵌入维度对比（核心实验）
+
+固定 `lr=1e-4, batch_size=32, epochs=10`，句向量输出维度固定为 100
+
+| 嵌入维度 | 句向量维度 | Loss（最后 epoch） | 准确率 | 耗时（秒） |
+|----------|-----------|-------------------|--------|-----------|
+| 100      | 100       | 0.3223            | 0.8397 | 1,829 |
+| 200      | 100       | **0.2553**        | **0.8556** ★ | 1,829 |
+
+> **注：** 句向量维度统一为 `output_dim=100`，仅改变词嵌入层和 Transformer 隐藏层维度。200 维嵌入相比 100 维准确率提升约 **1.59%**。
+
+### 3.5 扩展分析：学习率 2e-4 的特殊表现
+
+实验中观察到学习率 2e-4 在不同批次和嵌入维度下出现不一致的收敛行为：
+
+| 配置 | Loss | 准确率 | 是否收敛 |
+|------|------|--------|---------|
+| 2e-4, bs=32, dim=100 | 0.6932 | 0.7057 | ❌ |
+| 2e-4, bs=32, dim=200 | 0.6549 | 0.6586 | ❌ |
+| 2e-4, bs=64, dim=100 | **0.2970** | **0.8484** | ✅ |
+| 2e-4, bs=64, dim=200 | 0.6933 | 0.6602 | ❌ |
+
+**分析：** 值得注意的是，2e-4 搭配 bs=64、dim=100 时模型正常收敛并达到了 0.8484 的高准确率，但其他三种组合均未收敛。这说明较大学习率需要较大的批次大小来稳定梯度估计，同时模型参数量的增加（dim=200）进一步加剧了不稳定性。
+
+### 3.6 所有配置汇总
+
+| 学习率 | 批次大小 | 轮数 | 嵌入维度 | Loss | 准确率 | 耗时（秒） |
+|--------|----------|------|----------|------|--------|-----------|
+| 5e-5   | 32       | 10   | 100      | 0.3469 | 0.8332 | 1,817 |
+| 5e-5   | 32       | 10   | 200      | 0.2999 | 0.8427 | 1,817 |
+| 5e-5   | 64       | 10   | 100      | 0.4052 | 0.8118 | 1,757 |
+| 5e-5   | 64       | 10   | 200      | 0.3238 | 0.8358 | 1,757 |
+| 1e-4   | 32       | 5    | 100      | 0.4156 | 0.8054 | 957 |
+| 1e-4   | 32       | 5    | 200      | 0.3411 | 0.8373 | 957 |
+| 1e-4   | 32       | 10   | 100      | 0.3223 | 0.8397 | 1,829 |
+| 1e-4   | 32       | 10   | 200      | 0.2553 | **0.8556** ★ | 1,829 |
+| 1e-4   | 64       | 10   | 100      | 0.3345 | 0.8393 | 1,813 |
+| 1e-4   | 64       | 10   | 200      | 0.2743 | 0.8520 | 1,813 |
+| 2e-4   | 32       | 10   | 100      | 0.6932 | 0.7057 | 1,833 |
+| 2e-4   | 32       | 10   | 200      | 0.6549 | 0.6586 | 1,833 |
+| 2e-4   | 64       | 10   | 100      | 0.2970 | 0.8484 | 1,826 |
+| 2e-4   | 64       | 10   | 200      | 0.6933 | 0.6602 | 1,826 |
+
+### 3.7 结果分析
+
+1. **学习率影响：** 学习率是本次实验最敏感的超参数。1e-4 为最优学习率，5e-5 收敛速度略慢但也能达到不错的结果，2e-4 则存在大部分配置下不收敛的风险。
+
+2. **批次大小影响：** bs=32 和 bs=64 在 lr=1e-4 下表现接近，bs=32 略优。但在 lr=2e-4 下，bs=64 配合 dim=100 出现了意外的收敛效果，说明批次大小和学习率之间存在交互作用。
+
+3. **训练轮数影响：** 5 轮到 10 轮提升显著（0.8054 → 0.8413），Loss 持续下降，说明 10 轮的训练量对该任务而言是合理的选择。
+
+4. **嵌入维度影响：** 在所有收敛的配置中，200 维嵌入均优于 100 维嵌入，准确率提升约 0.5%~2.4%。高维嵌入层能更精细地表示词的语义信息，从而提升 Transformer 编码器的特征提取能力。
+
+---
+
+## 4 总结与思考
+
+### 4.1 实验结论
+
+- **向量维度增加为何可能提升模型性能？是否存在性能上限？**
+  200 维嵌入相比 100 维提供了更丰富的词表示空间，Transformer 编码器可以从中提取更细粒度的语义特征。但维度并非越高越好：更高的维度意味着更多参数，需要更多数据以避免过拟合，同时计算开销也更大。理论上存在与任务复杂度相关的维度上限，超过该上限后收益递减甚至出现过拟合。
+
+- **保持其他参数一致的意义是什么？如何验证参数设置的合理性？**
+  控制变量法是超参数实验的核心原则。当比较嵌入维度时，固定学习率、批次大小、轮数等参数，能确保准确率差异仅由嵌入维度引起。合理性验证方面，可以通过观察 Loss 曲线的下降趋势判断模型是否正常收敛，也可通过多次运行取平均值来排除随机性干扰。
+
+- **使用逻辑回归作为分类器有哪些优势与局限？**
+  优势在于简单、可解释性强、训练速度快，能够公正地评价不同句向量质量的线性可分性。局限在于逻辑回归是线性分类器，无法捕获句向量中可能存在的非线性判别信息，且对特征缩放敏感，需要进行标准化预处理。
+
+### 4.2 遇到的问题与解决方案
+
+| 问题 | 原因 | 解决方法 |
+|------|------|---------|
+| 学习率 ≥ 2e-4 时 Loss 不下降（卡在 0.693） | 学习率过大，优化器在损失平面震荡 | 降低学习率至 1e-4 或 5e-5 |
+| 参数 `output_dim` 同时控制词嵌入和投影层，含义模糊 | 原代码设计疏漏 | 增加 `embed_dim` 参数区分词嵌入维度和投影维度 |
+| PyTorch Nested Tensor 的 UserWarning | `batch_first=True` 未在 TransformerEncoderLayer 设置 | 添加 `batch_first=True` 消除 warning 并提高推理性能 |
+
+### 4.3 改进方向
+
+- 引入交叉验证机制，对每组参数运行多次取平均准确率，减少随机波动
+- 增加学习率 2e-4 与 bs=64、dim=100 的组合的分析——该组意外收敛值得进一步实验
+- 尝试更多嵌入维度（如 50、150、300）以观察维度与性能的关系曲线
+- 使用 t-SNE 或 PCA 对句向量进行可视化，直观展示不同维度的特征分布
+
+---
+
+## 参考文献
+
+1. Vaswani, A., et al. "Attention Is All You Need." Advances in Neural Information Processing Systems, 2017.
+2. Devlin, J., et al. "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding." NAACL, 2019.
+3. Maas, A., et al. "Learning Word Vectors for Sentiment Analysis." ACL, 2011.
