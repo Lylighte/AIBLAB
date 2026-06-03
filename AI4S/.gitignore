@@ -1,4 +1,9 @@
+# 日志文件
 log
+log_*
 log_iterative
+
+# 拟合图像
 fit.png
+fit_*.png
 fit/

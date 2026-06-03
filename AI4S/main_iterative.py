@@ -236,9 +236,9 @@ print(f"\n日志已保存到: {log_path}")
 
 # ==================== 绘制拟合图 ====================
 if best_feature is not None:
-    # 直接用 top-1 FeatureInformation 对象绘图
-    plot_result(all_features_sorted[0], focus, path)
-    print(f"拟合图已保存到: {os.path.join(path, 'fit.png')}")
+    plot_result(all_features_sorted[0], focus, path,
+                title='iterative_layered')
+    print(f"拟合图已保存到: {os.path.join(path, 'fit_iterative_layered.png')}")
 
 print(f"\n{'=' * 60}")
 print("  实验 7.6.4 完成!")

@@ -6,7 +6,18 @@ import os
 from feature_information import FeatureInformation
 
 
-def plot_result(feature:FeatureInformation, target:pd.DataFrame, path):
+def plot_result(feature: FeatureInformation, target: pd.DataFrame, path,
+                title: str = "fit", exp_config: dict = None):
+    """
+    绘制拟合图，标注 R²、公式。
+
+    参数:
+        feature: 最优特征对象
+        target: 目标值 DataFrame
+        path: 保存路径
+        title: 文件名标识（如 'exp_analytical_sis'）
+        exp_config: 实验配置信息（用于图片标题）
+    """
 
     # 定义颜色
     commoncolor3 = np.array([[81, 81, 81],
@@ -31,60 +42,81 @@ def plot_result(feature:FeatureInformation, target:pd.DataFrame, path):
     colorblue = np.array([36, 103, 180]) / 255.0
     redcolor = np.array([255, 59, 59]) / 255.0
 
-    x = feature.get_full_data().to_numpy().flatten()
-#     x_name = feature.get_full_name()
+    # 获取预测值（带系数）和真实值
+    x = feature.get_full_data().to_numpy().flatten()   # q_pred (带系数)
+    y = target.to_numpy().flatten()                     # q_real
 
-    y = target.to_numpy().flatten()
-#     y_name = target.columns[0]
-
-    # 创建图形2
+    # 创建图形
     fig, ax = plt.subplots(figsize=(9, 11))
     ax.set_facecolor('w')
 
     # 绘制数据点
-    ax.plot(x, y,  'o', color=threecolors[0,:],
+    ax.plot(x, y, 'o', color=threecolors[0, :],
             markersize=6,
-            markerfacecolor=threecolors[0,:],
-            markeredgecolor=threecolors[0,:], label='Data')
+            markerfacecolor=threecolors[0, :],
+            markeredgecolor=threecolors[0, :], label='Data')
 
-    x_max = x.max() + 1
-    y_max = y.max() + 1
+    # 坐标范围（归一化，保证对角线从原点开始）
+    data_max = max(x.max(), y.max())
+    data_min = min(x.min(), y.min())
+    plot_range = data_max - data_min
+    margin = plot_range * 0.08
+    axis_min = data_min - margin
+    axis_max = data_max + margin
 
-    # # 绘制拟合线
-    ax.plot([-1, max(x_max, y_max)], [-1, max(x_max, y_max)], '-',
-            color=redcolor, linewidth=4, label='Fit')
+    # 绘制拟合线（y = x 对角线）
+    ax.plot([axis_min, axis_max], [axis_min, axis_max], '-',
+            color=redcolor, linewidth=4, label='y = x (Perfect Fit)')
 
-    # 设置刻度和标签
-    ax.set_xticks(np.arange(0, x_max + max(x_max // 5, 1), max(x_max // 5, 1)))
-    ax.set_yticks(np.arange(0, y_max + max(y_max // 8, 1), max(y_max // 8, 1)))
-    ax.set_xlim([-0.3, x_max])
-    ax.set_ylim([-0.3, y_max])
-
+    # 设置刻度和范围
+    tick_step = max(plot_range // 6, 0.5)
+    ax.set_xticks(np.arange(0, axis_max + tick_step, tick_step))
+    ax.set_yticks(np.arange(0, axis_max + tick_step, tick_step))
+    ax.set_xlim([axis_min, axis_max])
+    ax.set_ylim([axis_min, axis_max])
 
     # 设置坐标轴标签
-    ax.set_xlabel(r'$q_{pre}$', fontsize=30, 
-                  fontweight='normal', family='DejaVu Sans')
-    ax.set_ylabel(r'$q_{real}$', fontsize=30, fontweight='normal', 
-                  family='DejaVu Sans')
+    ax.set_xlabel(r'$q_{pred}$', fontsize=30, fontweight='normal')
+    ax.set_ylabel(r'$q_{real}$', fontsize=30, fontweight='normal')
 
-    ax.spines['bottom'].set_linewidth(2)  # 底部轴加粗
-    ax.spines['left'].set_linewidth(2)    # 左侧轴加粗
-    ax.spines['top'].set_linewidth(2)     # 上侧轴加粗
-    ax.spines['right'].set_linewidth(2)   # 右侧轴加粗
+    ax.spines['bottom'].set_linewidth(2)
+    ax.spines['left'].set_linewidth(2)
+    ax.spines['top'].set_linewidth(2)
+    ax.spines['right'].set_linewidth(2)
 
-    # **显示上轴和右轴**
-    ax.tick_params(axis='x', which='both', direction='in', 
-                length=6, width=2, labelsize=12, top=True)  # X轴的刻度向内，上轴刻度开启
-    ax.tick_params(axis='y', which='both', direction='in', 
-                length=6, width=2, labelsize=12, right=True) # Y轴的刻度向内，右轴刻度开启
-    ax.tick_params(axis='both', which='minor', bottom=False, 
-                top=False, left=False, right=False)
-
-    # 设置字体
+    # 刻度格式
+    ax.tick_params(axis='x', which='both', direction='in',
+                   length=6, width=2, labelsize=12, top=True)
+    ax.tick_params(axis='y', which='both', direction='in',
+                   length=6, width=2, labelsize=12, right=True)
+    ax.tick_params(axis='both', which='minor', bottom=False,
+                   top=False, left=False, right=False)
     ax.tick_params(axis='both', labelsize=25)
     ax.minorticks_on()
 
-    # 显示图形
-    full_path = os.path.join(path, 'fit.png')
-    plt.savefig(full_path)
+    # === 添加 R² 和公式标注 ===
+    r2 = feature.get_r2()
+    formula = feature.get_full_name()
+    ax.text(0.05, 0.92, f'$R^2 = {r2:.4f}$',
+            transform=ax.transAxes, fontsize=28, fontweight='bold',
+            verticalalignment='top',
+            bbox=dict(facecolor='white', edgecolor='gray',
+                      boxstyle='round,pad=0.5'))
+
+    # 公式分行显示（如果太长）
+    formula_display = formula if len(formula) < 80 else formula[:77] + '...'
+    ax.text(0.05, 0.80, f'Formula:',
+            transform=ax.transAxes, fontsize=16, fontweight='bold',
+            verticalalignment='top')
+    ax.text(0.05, 0.72, f'{formula_display}',
+            transform=ax.transAxes, fontsize=14,
+            verticalalignment='top',
+            fontfamily='monospace',
+            bbox=dict(facecolor='lightyellow', edgecolor='gray',
+                      boxstyle='round,pad=0.3'))
+
+    # 显示图片
+    full_path = os.path.join(path, f'fit_{title}.png')
+    plt.savefig(full_path, dpi=150, bbox_inches='tight')
     plt.close()
+    print(f"  图片已保存: {full_path}")
