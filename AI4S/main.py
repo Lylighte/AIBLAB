@@ -11,11 +11,11 @@ import os
 # 选择系数拟合方法: 'analytical' 解析解, 'nn' 神经网络
 FIT_METHOD = 'analytical'
 # 是否使用 SIS 筛选 (True=开启SIS, False=关闭SIS)
-USE_SIS = True
+USE_SIS = False
 # SIS 保留的特征数
 SIS_N = 10
 # NN 超参数 (仅 FIT_METHOD='nn' 时生效)
-NN_EPOCHS = 100
+NN_EPOCHS = 500
 NN_BATCH_SIZE = 128
 NN_LR = 0.1
 # 结果保存路径
@@ -26,19 +26,19 @@ path = os.getcwd()
 # 自动生成实验标识
 _exp_label = f"{'nn' if FIT_METHOD == 'nn' else 'ana'}_{'sis' if USE_SIS else 'full'}"
 _exp_config = {
-    '方法': '神经网络' if FIT_METHOD == 'nn' else '解析解',
-    'SIS': f'开启 (n={SIS_N})' if USE_SIS else '关闭',
-    '扩展方式': 'expand_full (含除法)',
+    'method': 'neural_network' if FIT_METHOD == 'nn' else 'analytical',
+    'sis': f'on (n={SIS_N})' if USE_SIS else 'off',
+    'expansion': 'expand_full (with div)',
 }
 if FIT_METHOD == 'nn':
     _exp_config.update({
-        'NN_EPOCHS': NN_EPOCHS,
-        'NN_BATCH_SIZE': NN_BATCH_SIZE,
-        'NN_LR': NN_LR,
+        'nn_epochs': NN_EPOCHS,
+        'nn_batch_size': NN_BATCH_SIZE,
+        'nn_lr': NN_LR,
     })
 
 print(f"{'=' * 60}")
-print(f"  AI4S 实验 — 配置: {_exp_label}")
+print(f"  AI4S Experiment -- config: {_exp_label}")
 print(f"  FIT_METHOD={FIT_METHOD}, USE_SIS={USE_SIS}, SIS_N={SIS_N}")
 print(f"{'=' * 60}")
 
@@ -46,7 +46,7 @@ print(f"{'=' * 60}")
 data = pd.read_csv(os.path.join(path, "data.csv"))
 focus = pd.read_csv(os.path.join(path, "focus.csv"))
 
-print(f"原始特征: {data.shape[0]} 条, {data.shape[1]} 个特征 ({list(data.columns)})")
+print(f"Original: {data.shape[0]} rows, {data.shape[1]} features ({list(data.columns)})")
 
 # 初始输入的扩充
 data_expanded = expand_full(data, enable_binary_div=True)
@@ -67,6 +67,11 @@ r2, coef, loss, times = fit(data_selected, focus.to_numpy(),
                              batch_size=NN_BATCH_SIZE,
                              lr=NN_LR)
 
+# 记录耗时到日志配置
+total_time = sum(t for t in times if t is not None)
+_exp_config['total_time_s'] = f'{total_time:.4f}'
+_exp_config['avg_time_per_feat_s'] = f'{total_time/len(times):.4f}' if times else 'N/A'
+
 # 结果整理
 results = sort_result(data_selected.to_numpy(),
                       data_selected.columns.to_numpy(),
@@ -82,6 +87,6 @@ plot_result(results[0], focus, path,
 
 print(f"\n{'=' * 60}")
 print(f"  实验 [{_exp_label}] 完成!")
-print(f"  最优 R² = {results[0].get_r2():.6f}")
+print(f"  最优 R^2 = {results[0].get_r2():.6f}")
 print(f"  公式: {results[0].get_full_name()}")
 print(f"{'=' * 60}")

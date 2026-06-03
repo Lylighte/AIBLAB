@@ -27,7 +27,7 @@ CONFIG = {
     # 系数拟合方法: 'analytical' | 'nn'
     'fit_method': 'analytical',
     # 导向策略: 'layered' | 'crossover' | 'replace'
-    'strategy': 'layered',
+    'strategy': 'crossover',
     # SIS 每轮保留特征数
     'sis_n': 50,
     # 输出保留 top-N 结果

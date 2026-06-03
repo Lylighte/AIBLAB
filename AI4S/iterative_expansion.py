@@ -54,7 +54,7 @@ def expand_guided(top_nodes: list, feature_tree: FeatureTree,
     if strategy == 'replace':
         # 策略1: 用高分特征替换原始输入，做完整 expand
         return _expand_replace(top_nodes, top_data_list, top_names,
-                               original_data, seen_names)
+                               original_data, seen_names, enable_div)
 
     elif strategy == 'crossover':
         # 策略2: 高分特征 × 原始特征的幂次变体
@@ -72,7 +72,7 @@ def expand_guided(top_nodes: list, feature_tree: FeatureTree,
 
 
 def _expand_replace(top_nodes, top_data_list, top_names,
-                    orig_data, seen_names):
+                    orig_data, seen_names, enable_div=True):
     """
     替换策略: 将 top-K 高分特征作为新的"原始特征"做完整 expand
     优点: 简单直接

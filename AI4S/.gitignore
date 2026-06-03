@@ -2,6 +2,7 @@
 log
 log_*
 log_iterative
+expansion_report.txt
 
 # 拟合图像
 fit.png
